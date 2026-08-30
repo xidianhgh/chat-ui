@@ -6,7 +6,7 @@ import { fluctuateStock } from './stock.js'
 import { applyDepositInterest } from './bank.js'
 import { addItem, hasItem, useItem } from './items.js'
 import { addLog, getCurrentPlayer, calcNetWorth, ownsFullGroup, checkBankruptcy } from './gameState.js'
-import { aiFreeActions } from './ai.js'
+import { aiFreeActions, aiDecideBuy } from './ai.js'
 
 const delay = ms => new Promise(r => setTimeout(r, ms))
 
@@ -191,19 +191,28 @@ async function applyCardEffect(state, player, card, diceTotal) {
       break
 
     case 'move_to':
+      state.movingPlayerId = player.id
       moveToPosition(state, player, eff.position)
       addLog(state, `${player.name} 移动到 ${BOARD[eff.position].name}`)
+      await delay(600)
+      state.movingPlayerId = null
       await handleTileEvent(state, player, diceTotal)
       break
 
     case 'move_back':
+      state.movingPlayerId = player.id
       player.position = (player.position - eff.steps + 40) % 40
       addLog(state, `${player.name} 后退 ${eff.steps} 格到 ${BOARD[player.position].name}`)
+      await delay(600)
+      state.movingPlayerId = null
       await handleTileEvent(state, player, diceTotal)
       break
 
     case 'go_to_jail':
+      state.movingPlayerId = player.id
       sendToJail(state, player)
+      await delay(600)
+      state.movingPlayerId = null
       break
 
     case 'get_item':
@@ -245,28 +254,12 @@ async function applyCardEffect(state, player, card, diceTotal) {
   }
 }
 
-// AI 购买决策
-function aiDecideBuy(state, player, tile) {
-  const buyThreshold = tile.price * 1.5
-  if (player.money > buyThreshold || (tile.group && ownsFullGroup(player, tile.group))) {
-    buyProperty(state, player, tile)
-  } else if (player.money > tile.price * 0.8) {
-    // 70% 概率购买
-    if (Math.random() < 0.7) {
-      buyProperty(state, player, tile)
-    } else {
-      addLog(state, `${player.name} 决定不买 ${tile.name}`)
-    }
-  } else {
-    addLog(state, `${player.name} 资金不足，放弃购买 ${tile.name}`)
-  }
-}
-
 // 购买地产
 export function buyProperty(state, player, tile) {
   if (player.money < tile.price) return false
   player.money -= tile.price
-  player.properties.push(tile.id)
+  // 使用数组替换而非 push，确保 Vue 响应式检测到变化
+  player.properties = [...player.properties, tile.id]
   addLog(state, `${player.name} 购买了 ${tile.name}，花费 ${tile.price} 元`)
   return true
 }
@@ -280,7 +273,8 @@ export function buildHouse(state, player, tileIndex) {
   const current = player.buildings[tileIndex] || 0
   if (current >= 5) return false
   // 均匀建房规则简化：允许直接建
-  player.buildings[tileIndex] = current + 1
+  // 使用对象替换而非直接赋值，确保 Vue 响应式检测到变化
+  player.buildings = { ...player.buildings, [tileIndex]: current + 1 }
   player.money -= tile.buildCost
   const label = current + 1 === 5 ? '酒店' : `${current + 1}栋房子`
   addLog(state, `${player.name} 在 ${tile.name} 建造了${label}，花费 ${tile.buildCost} 元`)
@@ -323,6 +317,7 @@ async function handleJailTurn(state, player, diceResult) {
 // 执行一个玩家的回合
 export async function executeTurn(state) {
   const player = getCurrentPlayer(state)
+  console.log(`[引擎] executeTurn 开始, 玩家: ${player.name}, 破产: ${player.bankrupt}`)
   if (player.bankrupt) {
     nextPlayer(state)
     return
@@ -388,20 +383,36 @@ export async function executeTurn(state) {
   }
 
   // 移动
+  state.movingPlayerId = player.id
   await movePlayer(state, player, diceResult.total)
   addLog(state, `${player.name} 移动到 ${BOARD[player.position].name}`)
 
   await delay(600)
+  state.movingPlayerId = null
 
   // 处理格子事件
   await handleTileEvent(state, player, diceResult.total)
 
+  // 如果需要等待人类操作（购买地产弹窗等），暂停回合并返回
+  // 操作完成后由 App.vue 调用 finishTurnProcessing 继续
+  if (state.needAction) {
+    console.log(`[引擎] 等待人类操作, needAction=${state.needAction}`)
+    state.animating = false
+    return
+  }
+
+  console.log(`[引擎] 调用 finishTurnProcessing`)
+  await finishTurnProcessing(state, player, diceResult)
+  console.log(`[引擎] finishTurnProcessing 完成`)
+}
+
+// 回合结束处理：破产检查、股票波动、AI操作、双数判定、切换玩家
+export async function finishTurnProcessing(state, player, diceResult) {
   // 检查破产
   calcNetWorth(player, state.stocks, state.players)
   if (player.money < 0 && player.netWorth < 0) {
     player.bankrupt = true
     addLog(state, `${player.name} 破产了！`)
-    // 检查游戏是否结束
     const alive = state.players.filter(p => !p.bankrupt)
     if (alive.length === 1) {
       state.winner = alive[0]
@@ -427,8 +438,7 @@ export async function executeTurn(state) {
   if (diceResult.isDouble && state.doublesCount > 0 && state.doublesCount < 3) {
     addLog(state, `${player.name} 掷出双数，可以再掷一次！`)
     if (!player.isAI) {
-      // 让玩家继续操作
-      return
+      return // 让玩家继续操作
     }
   }
 
@@ -456,12 +466,17 @@ function nextPlayer(state) {
 // 确认卡片效果
 export async function confirmCard(state) {
   const player = getCurrentPlayer(state)
+  const previousAction = state.needAction
   if (state.pendingCard) {
     await applyCardEffect(state, player, state.pendingCard, state.currentDice?.total || 0)
   }
   state.showCardModal = false
   state.pendingCard = null
-  state.needAction = null
+  // 仅当 needAction 未被卡片效果改变时才清除
+  // （卡片可能导致移动到新格子并触发购买弹窗，此时 needAction 已被更新）
+  if (state.needAction === previousAction) {
+    state.needAction = null
+  }
 }
 
 // 结束回合

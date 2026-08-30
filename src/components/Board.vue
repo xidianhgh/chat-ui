@@ -9,6 +9,7 @@
         :tileIndex="idx"
         :players="players"
         :owners="ownersMap"
+        :movingPlayerId="movingPlayerId"
         :style="getTilePosition(idx)"
         @click="onTileClick"
       />
@@ -26,7 +27,8 @@ import { BOARD } from '../game/constants.js'
 import Tile from './Tile.vue'
 
 const props = defineProps({
-  players: Array
+  players: Array,
+  movingPlayerId: { type: Number, default: null }
 })
 
 const emit = defineEmits(['tile-click'])

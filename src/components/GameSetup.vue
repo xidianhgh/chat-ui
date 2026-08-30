@@ -26,8 +26,12 @@
 
       <div class="player-preview">
         <div v-for="i in humanCount + aiCount" :key="i" class="player-chip"
-             :style="{ background: colors[i-1] }">
-          {{ names[i-1] }}
+             :style="{ '--token-color': colors[i-1] }">
+          <div class="chip-piece">
+            <div class="chip-head"></div>
+            <div class="chip-base"></div>
+          </div>
+          <span class="chip-name">{{ names[i-1] }}</span>
           <span v-if="i > humanCount" class="ai-tag">AI</span>
         </div>
       </div>
@@ -135,11 +139,43 @@ const names = PLAYER_NAMES
 }
 
 .player-chip {
-  padding: 6px 16px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
   border-radius: 20px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.15);
   font-size: 0.85em;
-  font-weight: 600;
   color: #fff;
+}
+
+.chip-piece {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.chip-head {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--token-color);
+  border: 1px solid rgba(0,0,0,0.2);
+  box-shadow: inset 0 -1px 2px rgba(0,0,0,0.2), inset 0 1px 2px rgba(255,255,255,0.3);
+}
+
+.chip-base {
+  width: 16px;
+  height: 7px;
+  background: var(--token-color);
+  border: 1px solid rgba(0,0,0,0.2);
+  border-radius: 2px 2px 4px 4px;
+  margin-top: -2px;
+}
+
+.chip-name {
+  font-weight: 600;
 }
 
 .ai-tag {

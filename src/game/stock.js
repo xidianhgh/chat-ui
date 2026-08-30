@@ -27,8 +27,7 @@ export function buyStock(player, stock, shares) {
   const cost = stock.price * shares
   if (player.money < cost) return false
   player.money -= cost
-  if (!player.stocks) player.stocks = {}
-  player.stocks[stock.id] = (player.stocks[stock.id] || 0) + shares
+  player.stocks = { ...player.stocks, [stock.id]: (player.stocks[stock.id] || 0) + shares }
   return true
 }
 
@@ -37,8 +36,10 @@ export function sellStock(player, stock, shares) {
   if (!player.stocks || !player.stocks[stock.id] || player.stocks[stock.id] < shares) return false
   const income = stock.price * shares
   player.money += income
-  player.stocks[stock.id] -= shares
-  if (player.stocks[stock.id] === 0) delete player.stocks[stock.id]
+  const newStocks = { ...player.stocks }
+  newStocks[stock.id] -= shares
+  if (newStocks[stock.id] === 0) delete newStocks[stock.id]
+  player.stocks = newStocks
   return true
 }
 

@@ -35,7 +35,7 @@ export function mortgageProperty(player, tileIndex) {
   const mortgageValue = Math.floor(tile.price * BANK_MORTGAGE_RATE)
   player.money += mortgageValue
   player.mortgaged = player.mortgaged || []
-  player.mortgaged.push(tileIndex)
+  player.mortgaged = [...player.mortgaged, tileIndex]
   return mortgageValue
 }
 

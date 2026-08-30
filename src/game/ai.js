@@ -1,11 +1,35 @@
 // AI 决策逻辑
 import { BOARD, TILE_TYPES } from './constants.js'
-import { buildHouse } from './engine.js'
 import { buyStock, sellStock } from './stock.js'
 import { deposit } from './bank.js'
 import { addLog, ownsFullGroup } from './gameState.js'
 
 const delay = ms => new Promise(r => setTimeout(r, ms))
+
+// AI 购买决策
+export function aiDecideBuy(state, player, tile) {
+  const buyThreshold = tile.price * 1.5
+  if (player.money > buyThreshold || (tile.group && ownsFullGroup(player, tile.group))) {
+    doBuyProperty(state, player, tile)
+  } else if (player.money > tile.price * 0.8) {
+    // 70% 概率购买
+    if (Math.random() < 0.7) {
+      doBuyProperty(state, player, tile)
+    } else {
+      addLog(state, `${player.name} 决定不买 ${tile.name}`)
+    }
+  } else {
+    addLog(state, `${player.name} 资金不足，放弃购买 ${tile.name}`)
+  }
+}
+
+// AI 执行购买（内联逻辑，避免循环依赖）
+function doBuyProperty(state, player, tile) {
+  if (player.money < tile.price) return
+  player.money -= tile.price
+  player.properties = [...player.properties, tile.id]
+  addLog(state, `${player.name} 购买了 ${tile.name}，花费 ${tile.price} 元`)
+}
 
 // AI 自由操作阶段
 export async function aiFreeActions(state, player) {
@@ -33,7 +57,11 @@ async function aiTryBuild(state, player) {
 
     // 保留至少 2000 元现金
     if (player.money - tile.buildCost > 2000) {
-      buildHouse(state, player, tileIdx)
+      // 内联建房逻辑，避免循环依赖
+      player.buildings = { ...player.buildings, [tileIdx]: current + 1 }
+      player.money -= tile.buildCost
+      const label = current + 1 === 5 ? '酒店' : `${current + 1}栋房子`
+      addLog(state, `${player.name} 在 ${tile.name} 建造了${label}，花费 ${tile.buildCost} 元`)
     }
   }
 }

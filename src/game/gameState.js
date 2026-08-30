@@ -27,6 +27,7 @@ export function createGameState() {
     showDiceControl: false,
     // 动画
     animating: false,
+    movingPlayerId: null, // 正在移动的玩家ID，用于慧星尾拖效果
     // 游戏结果
     winner: null
   })

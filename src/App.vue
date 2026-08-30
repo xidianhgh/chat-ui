@@ -13,7 +13,7 @@
 
       <!-- 中间：棋盘 -->
       <div class="main-area">
-        <Board :players="state.players">
+        <Board :players="state.players" :movingPlayerId="state.movingPlayerId">
           <!-- 中心控制区 -->
           <div class="center-controls">
             <div class="turn-info">
@@ -107,7 +107,7 @@ import { computed, ref, watch, nextTick } from 'vue'
 import { BOARD, TILE_TYPES } from './game/constants.js'
 import { createGameState, initPlayers, addLog, getCurrentPlayer, calcNetWorth, ownsFullGroup } from './game/gameState.js'
 import { rollDice, rollFixed } from './game/dice.js'
-import { startGame, executeTurn, buyProperty, buildHouse, confirmCard, endTurn } from './game/engine.js'
+import { startGame, executeTurn, buyProperty, buildHouse, confirmCard, endTurn, finishTurnProcessing } from './game/engine.js'
 import { initStocks, buyStock, sellStock } from './game/stock.js'
 import { useItem, hasItem } from './game/items.js'
 
@@ -159,17 +159,27 @@ async function processCurrentTurn() {
   if (!player || player.bankrupt) return
 
   if (player.isAI) {
-    // AI 自动执行（executeTurn 内部已包含 AI 自由操作和 nextPlayer）
-    await delay(800)
-    await executeTurn(state)
-    await nextTick()
-    // 继续处理下一个玩家
-    if (state.phase === 'playing') {
-      await delay(500)
-      processCurrentTurn()
+    try {
+      await delay(800)
+      await executeTurn(state)
+      await nextTick()
+      if (state.phase === 'playing') {
+        await delay(500)
+        processCurrentTurn()
+      }
+    } catch (e) {
+      console.error('AI 回合执行出错:', e)
+      state.animating = false
+      state.needAction = null
+      const next = (state.currentPlayerIndex + 1) % state.players.length
+      state.currentPlayerIndex = next
+      state.currentDice = null
+      state.doublesCount = 0
+      if (state.phase === 'playing') {
+        processCurrentTurn()
+      }
     }
   }
-  // 人类玩家等待操作
 }
 
 // 掷骰子
@@ -182,18 +192,18 @@ async function onRollDice() {
   await delay(500)
   state.animating = false
 
-  // 执行回合
-  await executeTurn(state)
-
-  // 检查是否需要等待人类操作（弹窗等）
-  if (state.needAction) return
-
-  // 如果掷出双数，可以继续
-  if (state.currentDice?.isDouble && state.doublesCount > 0 && state.doublesCount < 3 && !player.bankrupt) {
-    return // 等待再次掷骰子
+  try {
+    // 执行回合（内部已包含 finishTurnProcessing：破产检查、股票波动、双数判定、切换玩家）
+    await executeTurn(state)
+  } catch (e) {
+    console.error('回合执行出错:', e)
+    state.animating = false
+    state.needAction = null
   }
 
-  // 回合结束，触发下一个玩家
+  // 如果需要等待人类操作（购买地产弹窗等），等待用户操作
+  if (state.needAction) return
+
   if (state.phase === 'playing') {
     await delay(500)
     processCurrentTurn()
@@ -201,32 +211,59 @@ async function onRollDice() {
 }
 
 // 购买地产
-function onBuyProperty() {
+async function onBuyProperty() {
   const player = getCurrentPlayer(state)
+  const diceResult = state.currentDice
   if (state.pendingProperty) {
     buyProperty(state, player, state.pendingProperty.tile)
   }
   state.showPropertyModal = false
   state.pendingProperty = null
   state.needAction = null
+  // 继续回合结束处理（破产检查、股票波动、双数判定等）
+  if (diceResult && state.phase === 'playing') {
+    await finishTurnProcessing(state, player, diceResult)
+  }
+  // 启动下一个玩家的回合（因为 needAction 导致 onRollDice 提前返回，它无法调用 processCurrentTurn）
+  if (state.phase === 'playing') {
+    await delay(500)
+    processCurrentTurn()
+  }
 }
 
 // 放弃购买
-function onSkipBuy() {
+async function onSkipBuy() {
+  const player = getCurrentPlayer(state)
+  const diceResult = state.currentDice
   state.showPropertyModal = false
   state.pendingProperty = null
   state.needAction = null
-  addLog(state, `${currentPlayer.value.name} 放弃购买`)
+  addLog(state, `${player.name} 放弃购买`)
+  if (diceResult && state.phase === 'playing') {
+    await finishTurnProcessing(state, player, diceResult)
+  }
+  // 启动下一个玩家的回合
+  if (state.phase === 'playing') {
+    await delay(500)
+    processCurrentTurn()
+  }
 }
 
 // 确认卡片
 async function onConfirmCard() {
   await confirmCard(state)
-  // 卡片可能导致移动和新事件，检查是否又需要操作
+  // 卡片可能导致移动和新事件（如购买地产弹窗），检查是否又需要操作
   if (state.needAction) return
-  // 卡片效果完成后，如果回合结束，触发下一个玩家
-  if (state.phase === 'playing' && !state.needAction) {
-    // 人类玩家可以继续操作（建房、股票等），或点击结束回合
+  // 卡片效果完成后，继续回合结束处理
+  const player = currentPlayer.value
+  const diceResult = state.currentDice
+  if (player && diceResult && state.phase === 'playing') {
+    await finishTurnProcessing(state, player, diceResult)
+  }
+  // 启动下一个玩家的回合
+  if (state.phase === 'playing') {
+    await delay(500)
+    processCurrentTurn()
   }
 }
 

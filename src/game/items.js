@@ -4,7 +4,7 @@ import { ITEM_NAMES } from './constants.js'
 // 获取道具
 export function addItem(player, itemType) {
   player.items = player.items || []
-  player.items.push(itemType)
+  player.items = [...player.items, itemType]
 }
 
 // 使用道具
@@ -12,7 +12,7 @@ export function useItem(player, itemType) {
   if (!player.items) return false
   const idx = player.items.indexOf(itemType)
   if (idx === -1) return false
-  player.items.splice(idx, 1)
+  player.items = player.items.filter((_, i) => i !== idx)
   return true
 }
 

@@ -3,8 +3,9 @@
     <div v-for="player in players" :key="player.id"
          class="player-card" :class="{ active: player.id === currentPlayerId, bankrupt: player.bankrupt }">
       <div class="player-header" :style="{ borderLeftColor: player.color }">
-        <div class="player-avatar" :style="{ background: player.color }">
-          {{ player.name[0] }}
+        <div class="player-avatar" :style="{ '--token-color': player.color }">
+          <div class="avatar-head"></div>
+          <div class="avatar-base"></div>
         </div>
         <div class="player-info">
           <div class="player-name">
@@ -16,9 +17,9 @@
         </div>
       </div>
       <div class="player-stats">
-        <div class="stat">
+        <div class="stat clickable" @click="toggleProperties(player.id)">
           <span class="stat-label">地产</span>
-          <span class="stat-value">{{ player.properties.length }}</span>
+          <span class="stat-value">{{ player.properties.length }} <span v-if="player.properties.length" class="toggle-hint">{{ expanded[player.id] ? '▲' : '▼' }}</span></span>
         </div>
         <div class="stat">
           <span class="stat-label">净资产</span>
@@ -27,6 +28,15 @@
         <div class="stat">
           <span class="stat-label">存款</span>
           <span class="stat-value">{{ player.bankDeposit || 0 }}</span>
+        </div>
+      </div>
+      <!-- 地产列表 -->
+      <div v-if="expanded[player.id] && player.properties.length" class="property-list">
+        <div v-for="tileIdx in player.properties" :key="tileIdx" class="property-item">
+          <span class="property-dot" :style="{ background: getPropertyColor(tileIdx) }"></span>
+          <span class="property-name">{{ BOARD[tileIdx].name }}</span>
+          <span v-if="player.buildings[tileIdx]" class="property-building">{{ getBuildingLabel(player.buildings[tileIdx]) }}</span>
+          <span v-if="player.mortgaged && player.mortgaged.includes(tileIdx)" class="property-mortgaged">抵押</span>
         </div>
       </div>
       <div v-if="player.inJail" class="jail-indicator">🔒 监狱中 ({{ player.jailTurns }}/3)</div>
@@ -38,10 +48,29 @@
 </template>
 
 <script setup>
+import { reactive } from 'vue'
+import { BOARD, COLOR_GROUPS } from '../game/constants.js'
+
 defineProps({
   players: Array,
   currentPlayerId: Number
 })
+
+const expanded = reactive({})
+
+function toggleProperties(playerId) {
+  expanded[playerId] = !expanded[playerId]
+}
+
+function getPropertyColor(tileIdx) {
+  const tile = BOARD[tileIdx]
+  return COLOR_GROUPS[tile.group] || '#999'
+}
+
+function getBuildingLabel(level) {
+  if (level === 5) return '🏨'
+  return '🏠'.repeat(level)
+}
 </script>
 
 <style scoped>
@@ -77,15 +106,32 @@ defineProps({
 }
 
 .player-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
+  width: 36px;
+  height: 36px;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  color: #fff;
-  font-size: 14px;
+  justify-content: flex-end;
+}
+
+.avatar-head {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--token-color);
+  border: 1.5px solid rgba(0,0,0,0.2);
+  box-shadow: inset 0 -2px 3px rgba(0,0,0,0.2), inset 0 2px 3px rgba(255,255,255,0.3);
+  z-index: 1;
+}
+
+.avatar-base {
+  width: 24px;
+  height: 12px;
+  background: var(--token-color);
+  border: 1.5px solid rgba(0,0,0,0.2);
+  border-radius: 4px 4px 6px 6px;
+  margin-top: -4px;
+  box-shadow: inset 0 -2px 3px rgba(0,0,0,0.15);
 }
 
 .player-name {
@@ -139,6 +185,64 @@ defineProps({
   font-size: 12px;
   color: rgba(255,255,255,0.8);
   font-weight: 600;
+}
+
+.stat.clickable {
+  cursor: pointer;
+}
+
+.stat.clickable:hover .stat-value {
+  color: #fff;
+}
+
+.toggle-hint {
+  font-size: 8px;
+  opacity: 0.6;
+}
+
+.property-list {
+  margin-top: 6px;
+  padding-left: 42px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.property-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  color: rgba(255,255,255,0.75);
+}
+
+.property-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.property-name {
+  flex: 1;
+}
+
+.property-building {
+  font-size: 9px;
+}
+
+.property-mortgaged {
+  font-size: 8px;
+  color: #e74c3c;
+  background: rgba(231,76,60,0.15);
+  padding: 0 4px;
+  border-radius: 3px;
 }
 
 .jail-indicator {

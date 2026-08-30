@@ -20,7 +20,7 @@ const CHANCE_CARDS = [
 ]
 
 const DESTINY_CARDS = [
-  { text: '遗产继承，获得 1000 元', effect: { type: 'money', amount: 1000 } },
+  { text: '彩票中奖，获得 1000 元', effect: { type: 'money', amount: 1000 } },
   { text: '缴纳学费 500 元', effect: { type: 'money', amount: -500 } },
   { text: '前进到免费停车', effect: { type: 'move_to', position: 20 } },
   { text: '入狱！直接前往监狱', effect: { type: 'go_to_jail' } },

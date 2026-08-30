@@ -9,8 +9,9 @@
     <div v-if="isMortgaged" class="mortgage-mark">抵</div>
     <!-- 玩家棋子 -->
     <div class="players-on-tile">
-      <div v-for="p in playersHere" :key="p.id" class="player-token" :style="{ background: p.color }">
-        {{ p.name[0] }}
+      <div v-for="p in playersHere" :key="p.id" class="player-token" :class="{ moving: movingPlayerId === p.id }" :style="{ '--token-color': p.color }">
+        <div class="token-base"></div>
+        <div class="token-head"></div>
       </div>
     </div>
   </div>
@@ -24,7 +25,8 @@ const props = defineProps({
   tile: Object,
   players: Array,
   tileIndex: Number,
-  owners: Object // tileIndex -> player
+  owners: Object, // tileIndex -> player
+  movingPlayerId: { type: Number, default: null }
 })
 
 defineEmits(['click'])
@@ -165,24 +167,118 @@ const tileStyle = computed(() => ({}))
 
 .players-on-tile {
   position: absolute;
-  bottom: 1px;
-  left: 1px;
+  bottom: 2px;
+  left: 2px;
   display: flex;
-  gap: 2px;
+  gap: 3px;
+  align-items: flex-end;
 }
 
 .player-token {
+  position: relative;
+  width: 22px;
+  height: 26px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.4));
+  transition: all 0.5s ease;
+  transform: rotate(180deg);
+}
+
+/* 慧星尾拖效果 */
+.player-token.moving {
+  animation: cometPulse 0.4s ease-in-out infinite alternate;
+}
+
+.player-token.moving .token-head {
+  box-shadow:
+    0 0 6px var(--token-color),
+    0 0 12px var(--token-color),
+    0 0 20px var(--token-color),
+    inset 0 -2px 3px rgba(0,0,0,0.2),
+    inset 0 2px 3px rgba(255,255,255,0.3);
+}
+
+.player-token.moving .token-base {
+  box-shadow:
+    0 0 6px var(--token-color),
+    0 0 12px var(--token-color),
+    inset 0 -2px 3px rgba(0,0,0,0.15),
+    0 1px 2px rgba(0,0,0,0.2);
+}
+
+.player-token.moving::before,
+.player-token.moving::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.player-token.moving::before {
   width: 16px;
   height: 16px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(circle, var(--token-color) 0%, transparent 70%);
+  opacity: 0.6;
+  animation: cometGlow 0.5s ease-in-out infinite alternate;
+}
+
+.player-token.moving::after {
+  width: 28px;
+  height: 28px;
+  top: 60%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(circle, var(--token-color) 0%, transparent 60%);
+  opacity: 0.3;
+  animation: cometGlow 0.7s ease-in-out infinite alternate-reverse;
+}
+
+@keyframes cometPulse {
+  from {
+    filter: drop-shadow(0 0 4px var(--token-color)) drop-shadow(0 0 8px var(--token-color));
+  }
+  to {
+    filter: drop-shadow(0 0 8px var(--token-color)) drop-shadow(0 0 16px var(--token-color)) drop-shadow(0 0 24px var(--token-color));
+  }
+}
+
+@keyframes cometGlow {
+  from {
+    opacity: 0.3;
+    transform: translate(-50%, -50%) scale(0.8);
+  }
+  to {
+    opacity: 0.7;
+    transform: translate(-50%, -50%) scale(1.2);
+  }
+}
+
+/* 棋子头部 - 圆形 */
+.token-head {
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 9px;
-  font-weight: 700;
-  color: #fff;
-  border: 1px solid rgba(0,0,0,0.3);
-  transition: all 0.5s ease;
+  background: var(--token-color);
+  border: 1.5px solid rgba(0,0,0,0.25);
+  box-shadow: inset 0 -2px 3px rgba(0,0,0,0.2), inset 0 2px 3px rgba(255,255,255,0.3);
+  z-index: 1;
+}
+
+/* 棋子底座 - 梯形 */
+.token-base {
+  width: 18px;
+  height: 10px;
+  background: var(--token-color);
+  border: 1.5px solid rgba(0,0,0,0.25);
+  border-radius: 3px 3px 5px 5px;
+  margin-top: -3px;
+  box-shadow: inset 0 -2px 3px rgba(0,0,0,0.15), 0 1px 2px rgba(0,0,0,0.2);
 }
 
 .tile-go { background: #ffeaa7; }
