@@ -294,8 +294,8 @@ function tileDescription(tile) {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #f5f0e8 0%, #ede4d4 100%);
-  border: 1px solid #c9b99a;
+  background: linear-gradient(135deg, #1a2a4a 0%, #0f1d36 100%);
+  border: 1px solid #2c4a7c;
 }
 
 /* 详情弹窗 */

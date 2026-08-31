@@ -43,9 +43,9 @@
             </div>
 
             <div class="action-buttons secondary">
-              <button class="btn-sm" @click="state.showStockPanel = true" :disabled="!isHumanTurn">📈 股票</button>
-              <button class="btn-sm" @click="state.showBankPanel = true" :disabled="!isHumanTurn">🏦 银行</button>
-              <button class="btn-sm" @click="onBuildMode" :disabled="!isHumanTurn">🏠 建房</button>
+              <button class="btn-sm" data-tooltip="买卖4家公司的股票，赚取差价。股价实时波动，可低买高卖。" @click="state.showStockPanel = true" :disabled="!isHumanTurn">📈 股票</button>
+              <button class="btn-sm" data-tooltip="存款获得5%利息，抵押地产获得半价资金，赎回需付抵押价+10%利息。" @click="state.showBankPanel = true" :disabled="!isHumanTurn">🏦 银行</button>
+              <button class="btn-sm" data-tooltip="集齐同色全套地产后，可在此套地产上建房（最多酒店），建筑越多租金越高。" @click="onBuildMode" :disabled="!isHumanTurn">🏠 建房</button>
             </div>
 
             <!-- 建房模式 -->
@@ -491,6 +491,37 @@ const delay = ms => new Promise(r => setTimeout(r, ms))
 .btn-sm:disabled {
   opacity: 0.3;
   cursor: not-allowed;
+}
+
+/* 悬浮提示 */
+.btn-sm[data-tooltip] {
+  position: relative;
+}
+
+.btn-sm[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.85);
+  color: #fff;
+  font-size: 12px;
+  line-height: 1.5;
+  padding: 8px 12px;
+  border-radius: 8px;
+  white-space: normal;
+  width: 200px;
+  text-align: center;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s;
+  z-index: 1000;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+.btn-sm[data-tooltip]:hover::after {
+  opacity: 1;
 }
 
 .build-panel {
