@@ -65,10 +65,16 @@ function calcRent(state, tileIndex, diceTotal) {
 
   if (tile.type === TILE_TYPES.PROPERTY) {
     const building = owner.buildings[tileIndex] || 0
-    let rent = tile.rent[building] || tile.rent[0]
-    // 空地且拥有全套：双倍租金
-    if (building === 0 && ownsFullGroup(owner, tile.group)) {
-      rent *= 2
+    let rent
+    if (building >= 5) {
+      // 酒店：4栋租金的双倍
+      rent = tile.rent[4] * 2
+    } else {
+      rent = tile.rent[building]
+      // 空地且拥有全套：双倍租金
+      if (building === 0 && ownsFullGroup(owner, tile.group)) {
+        rent *= 2
+      }
     }
     return { amount: rent, to: owner }
   }

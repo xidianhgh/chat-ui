@@ -1,5 +1,5 @@
 <template>
-  <div class="tile" :class="tileClasses" :style="tileStyle" @click="$emit('click', tile)">
+  <div class="tile" :class="tileClasses" :style="tileStyle" @click="$emit('click', tileIndex)">
     <div v-if="tile.group" class="color-bar" :style="{ background: groupColor }"></div>
     <div class="tile-icon">{{ tileIcon }}</div>
     <div class="tile-name">{{ tile.name }}</div>

@@ -14,7 +14,7 @@ const CHANCE_CARDS = [
   { text: '获得免租牌道具', effect: { type: 'get_item', item: 'free_rent' } },
   { text: '股票分红，获得 300 元', effect: { type: 'money', amount: 300 } },
   { text: '医疗费用，支付 500 元', effect: { type: 'money', amount: -500 } },
-  { text: '前进到东站(15)', effect: { type: 'move_to', position: 15 } },
+  { text: '前进到西站(15)', effect: { type: 'move_to', position: 15 } },
   { text: '获得护身符道具', effect: { type: 'get_item', item: 'shield' } },
   { text: '生日！每位其他玩家给你 200 元', effect: { type: 'birthday', amount: 200 } }
 ]
