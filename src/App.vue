@@ -1,5 +1,8 @@
 <template>
   <div class="app">
+    <!-- 音乐控制 - 全局显示 -->
+    <MusicControl />
+
     <!-- 游戏设置阶段 -->
     <GameSetup v-if="state.phase === 'setup'" @start="onGameStart" />
 
@@ -121,9 +124,14 @@ import StockPanel from './components/StockPanel.vue'
 import BankPanel from './components/BankPanel.vue'
 import ItemBar from './components/ItemBar.vue'
 import GameLog from './components/GameLog.vue'
+import MusicControl from './components/MusicControl.vue'
+import { initMusic } from './game/music.js'
 
 const state = createGameState()
 const buildMode = ref(false)
+
+// 初始化音乐系统
+initMusic()
 
 const currentPlayer = computed(() => getCurrentPlayer(state))
 const isHumanTurn = computed(() => currentPlayer.value && !currentPlayer.value.isAI && !currentPlayer.value.bankrupt)
@@ -174,7 +182,6 @@ async function processCurrentTurn() {
       const next = (state.currentPlayerIndex + 1) % state.players.length
       state.currentPlayerIndex = next
       state.currentDice = null
-      state.doublesCount = 0
       if (state.phase === 'playing') {
         processCurrentTurn()
       }

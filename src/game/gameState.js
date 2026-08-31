@@ -15,7 +15,6 @@ export function createGameState() {
     logs: [],
     // 当前回合状态
     currentDice: null,
-    doublesCount: 0,
     needAction: null, // null, 'buy_property', 'card', 'jail', 'pay_rent'
     pendingProperty: null,
     pendingCard: null,

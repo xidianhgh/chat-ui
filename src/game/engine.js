@@ -367,21 +367,6 @@ export async function executeTurn(state) {
     addLog(state, `${player.name} 掷出 [${diceResult.d1}+${diceResult.d2}=${diceResult.total}]`)
   }
 
-  // 双数计数
-  if (diceResult.isDouble) {
-    state.doublesCount++
-    if (state.doublesCount >= 3) {
-      addLog(state, `${player.name} 连续三次双数，直接入狱！`)
-      sendToJail(state, player)
-      state.animating = false
-      await delay(800)
-      nextPlayer(state)
-      return
-    }
-  } else {
-    state.doublesCount = 0
-  }
-
   // 移动
   state.movingPlayerId = player.id
   await movePlayer(state, player, diceResult.total)
@@ -434,14 +419,6 @@ export async function finishTurnProcessing(state, player, diceResult) {
     await aiFreeActions(state, player)
   }
 
-  // 双数可以再掷一次（非AI时让玩家手动操作）
-  if (diceResult.isDouble && state.doublesCount > 0 && state.doublesCount < 3) {
-    addLog(state, `${player.name} 掷出双数，可以再掷一次！`)
-    if (!player.isAI) {
-      return // 让玩家继续操作
-    }
-  }
-
   await delay(500)
   nextPlayer(state)
 }
@@ -460,7 +437,6 @@ function nextPlayer(state) {
   state.currentPlayerIndex = next
   state.currentDice = null
   state.needAction = null
-  state.doublesCount = 0
 }
 
 // 确认卡片效果
@@ -483,11 +459,6 @@ export async function confirmCard(state) {
 export function endTurn(state) {
   const player = getCurrentPlayer(state)
   calcNetWorth(player, state.stocks, state.players)
-
-  // 双数继续
-  if (state.currentDice?.isDouble && state.doublesCount > 0 && state.doublesCount < 3 && !player.bankrupt) {
-    return // 让玩家继续掷骰子
-  }
 
   nextPlayer(state)
 }
