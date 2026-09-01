@@ -122,7 +122,7 @@ const tileStyle = computed(() => ({}))
 }
 
 .tile-name {
-  font-size: 10px;
+  font-size: 14px;
   font-weight: 600;
   color: #333;
   text-align: center;
@@ -133,16 +133,16 @@ const tileStyle = computed(() => ({}))
 }
 
 .tile-corner .tile-name {
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .tile-price {
-  font-size: 9px;
+  font-size: 11px;
   color: #888;
 }
 
 .buildings {
-  font-size: 10px;
+  font-size: 12px;
   line-height: 1;
 }
 
