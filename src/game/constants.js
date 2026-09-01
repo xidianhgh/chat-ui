@@ -140,6 +140,7 @@ export const ITEM_NAMES = {
 }
 
 // 银行利率
-export const BANK_DEPOSIT_RATE = 0.05
+export const BANK_DEPOSIT_RATE = 0.02
+export const BANK_LOAN_RATE = 0.03           // 贷款利率：每回合 3%
 export const BANK_MORTGAGE_RATE = 0.5  // 抵押获得地产价格的一半
 export const BANK_MORTGAGE_REPAY_RATE = 0.55 // 赎回需付抵押价+10%利息

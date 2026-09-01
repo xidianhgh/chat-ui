@@ -3,7 +3,7 @@ import { BOARD, TILE_TYPES, START_SALARY, JAIL_FINE, GROUP_TILES, RAILROADS, get
 import { rollDice, rollFixed } from './dice.js'
 import { drawCard } from './cards.js'
 import { fluctuateStock } from './stock.js'
-import { applyDepositInterest } from './bank.js'
+import { applyDepositInterest, applyLoanInterest } from './bank.js'
 import { addItem, hasItem, useItem, getItemName } from './items.js'
 import { addLog, getCurrentPlayer, calcNetWorth, ownsFullGroup, checkBankruptcy } from './gameState.js'
 import { aiFreeActions, aiDecideBuy } from './ai.js'
@@ -336,6 +336,12 @@ export async function executeTurn(state) {
   const interest = applyDepositInterest(player)
   if (interest > 0) {
     addLog(state, `${player.name} 获得存款利息 ${interest} 元`, player.color)
+  }
+
+  // 贷款利息
+  const loanInterest = applyLoanInterest(player)
+  if (loanInterest > 0) {
+    addLog(state, `${player.name} 支付贷款利息 ${loanInterest} 元`, player.color)
   }
 
   // 监狱处理

@@ -1,11 +1,21 @@
 // 银行系统逻辑
-import { BANK_DEPOSIT_RATE, BANK_MORTGAGE_RATE, BANK_MORTGAGE_REPAY_RATE, BOARD } from './constants.js'
+import { BANK_DEPOSIT_RATE, BANK_LOAN_RATE, BANK_MORTGAGE_RATE, BANK_MORTGAGE_REPAY_RATE, BOARD } from './constants.js'
 
 // 存款利息
 export function applyDepositInterest(player) {
   if (player.bankDeposit > 0) {
     const interest = Math.floor(player.bankDeposit * BANK_DEPOSIT_RATE)
     player.bankDeposit += interest
+    return interest
+  }
+  return 0
+}
+
+// 贷款利息
+export function applyLoanInterest(player) {
+  if (player.bankLoan > 0) {
+    const interest = Math.ceil(player.bankLoan * BANK_LOAN_RATE)
+    player.bankLoan += interest
     return interest
   }
   return 0
