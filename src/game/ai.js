@@ -16,10 +16,10 @@ export function aiDecideBuy(state, player, tile) {
     if (Math.random() < 0.7) {
       doBuyProperty(state, player, tile)
     } else {
-      addLog(state, `${player.name} 决定不买 ${tile.name}`)
+      addLog(state, `${player.name} 决定不买 ${tile.name}`, player.color)
     }
   } else {
-    addLog(state, `${player.name} 资金不足，放弃购买 ${tile.name}`)
+    addLog(state, `${player.name} 资金不足，放弃购买 ${tile.name}`, player.color)
   }
 }
 
@@ -28,7 +28,7 @@ function doBuyProperty(state, player, tile) {
   if (player.money < tile.price) return
   player.money -= tile.price
   player.properties = [...player.properties, tile.id]
-  addLog(state, `${player.name} 购买了 ${tile.name}，花费 ${tile.price} 元`)
+  addLog(state, `${player.name} 购买了 ${tile.name}，花费 ${tile.price} 元`, player.color)
 }
 
 // AI 自由操作阶段
@@ -61,7 +61,7 @@ async function aiTryBuild(state, player) {
       player.buildings = { ...player.buildings, [tileIdx]: current + 1 }
       player.money -= tile.buildCost
       const label = current + 1 === 5 ? '酒店' : `${current + 1}栋房子`
-      addLog(state, `${player.name} 在 ${tile.name} 建造了${label}，花费 ${tile.buildCost} 元`)
+      addLog(state, `${player.name} 在 ${tile.name} 建造了${label}，花费 ${tile.buildCost} 元`, player.color)
     }
   }
 }
@@ -80,12 +80,12 @@ async function aiTryStocks(state, player) {
       const shares = Math.min(5, Math.floor(player.money * 0.1 / stock.price))
       if (shares > 0) {
         buyStock(player, stock, shares)
-        addLog(state, `${player.name} 买入 ${stock.name} ${shares}股`)
+        addLog(state, `${player.name} 买入 ${stock.name} ${shares}股`, player.color)
       }
     } else if (stock.price > avgCost * 1.3 && owned > 0) {
       // 高价卖出
       sellStock(player, stock, owned)
-      addLog(state, `${player.name} 卖出 ${stock.name} ${owned}股`)
+      addLog(state, `${player.name} 卖出 ${stock.name} ${owned}股`, player.color)
     }
   }
 }

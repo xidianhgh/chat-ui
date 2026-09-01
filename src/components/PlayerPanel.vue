@@ -29,6 +29,10 @@
           <span class="stat-label">存款</span>
           <span class="stat-value">{{ player.bankDeposit || 0 }}</span>
         </div>
+        <div class="stat" v-if="player.bankLoan">
+          <span class="stat-label">贷款</span>
+          <span class="stat-value loan-value">{{ player.bankLoan }}</span>
+        </div>
       </div>
       <!-- 地产列表 -->
       <div v-if="expanded[player.id] && player.properties.length" class="property-list">
@@ -40,8 +44,17 @@
         </div>
       </div>
       <div v-if="player.inJail" class="jail-indicator">🔒 监狱中 ({{ player.jailTurns }}/3)</div>
-      <div v-if="player.items && player.items.length" class="items-indicator">
-        🎒 {{ player.items.length }}个道具
+      <div v-if="player.items && player.items.length" class="items-indicator clickable" @click="toggleItems(player.id)">
+        🎒 {{ player.items.length }}个道具 <span class="toggle-hint">{{ itemsExpanded[player.id] ? '▲' : '▼' }}</span>
+      </div>
+      <div v-if="itemsExpanded[player.id] && player.items && player.items.length" class="item-list">
+        <div v-for="(item, idx) in player.items" :key="idx" class="item-item">
+          <span class="item-icon">{{ getItemIcon(item) }}</span>
+          <span class="item-name">{{ getItemLabel(item) }}</span>
+        </div>
+      </div>
+      <div v-if="player.jailFreeCards && player.jailFreeCards > 0" class="jailfree-indicator">
+        🗝️ 免费出狱卡 ×{{ player.jailFreeCards }}
       </div>
     </div>
   </div>
@@ -49,7 +62,7 @@
 
 <script setup>
 import { reactive } from 'vue'
-import { BOARD, COLOR_GROUPS } from '../game/constants.js'
+import { BOARD, COLOR_GROUPS, ITEM_NAMES } from '../game/constants.js'
 
 defineProps({
   players: Array,
@@ -57,9 +70,18 @@ defineProps({
 })
 
 const expanded = reactive({})
+const itemsExpanded = reactive({})
 
 function toggleProperties(playerId) {
   expanded[playerId] = !expanded[playerId]
+}
+
+function toggleItems(playerId) {
+  itemsExpanded[playerId] = !itemsExpanded[playerId]
+}
+
+function getItemLabel(itemType) {
+  return ITEM_NAMES[itemType] || itemType
 }
 
 function getPropertyColor(tileIdx) {
@@ -70,6 +92,18 @@ function getPropertyColor(tileIdx) {
 function getBuildingLabel(level) {
   if (level === 5) return '🏨'
   return '🏠'.repeat(level)
+}
+
+const ITEM_ICONS = {
+  dice_control: '🎲',
+  barrier: '🚧',
+  teleport: '🌀',
+  free_rent: '🆓',
+  shield: '🛡️'
+}
+
+function getItemIcon(itemType) {
+  return ITEM_ICONS[itemType] || '📦'
 }
 </script>
 
@@ -255,6 +289,46 @@ function getBuildingLabel(level) {
 .items-indicator {
   font-size: 11px;
   color: #f39c12;
+  margin-top: 2px;
+  padding-left: 42px;
+}
+
+.items-indicator.clickable {
+  cursor: pointer;
+}
+
+.items-indicator.clickable:hover {
+  color: #f1c40f;
+}
+
+.item-list {
+  margin-top: 4px;
+  padding-left: 42px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  animation: fadeIn 0.2s ease;
+}
+
+.item-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  color: rgba(255,255,255,0.75);
+}
+
+.item-icon {
+  font-size: 11px;
+}
+
+.item-name {
+  color: #f39c12;
+}
+
+.jailfree-indicator {
+  font-size: 11px;
+  color: #e67e22;
   margin-top: 2px;
   padding-left: 42px;
 }

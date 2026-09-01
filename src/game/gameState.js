@@ -60,9 +60,9 @@ export function initPlayers(humanCount, aiCount) {
   return players
 }
 
-export function addLog(state, message) {
+export function addLog(state, message, color) {
   const time = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-  state.logs.unshift({ time, message })
+  state.logs.unshift({ time, message, color })
   if (state.logs.length > 200) state.logs.pop()
 }
 

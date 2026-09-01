@@ -15,6 +15,12 @@
       />
       <!-- 中心区域 -->
       <div class="board-center">
+        <div class="win-condition">
+          <div class="wc-title">🏆 胜负条件</div>
+          <div class="wc-line">所有其他玩家破产后，最后存活的玩家获胜</div>
+          <div class="wc-sub">破产 = 现金为负 且 净资产为负</div>
+          <div class="wc-sub">净资产 = 现金 + 存款 + 地产 + 股票 − 贷款</div>
+        </div>
         <slot></slot>
       </div>
 
@@ -296,6 +302,38 @@ function tileDescription(tile) {
   justify-content: center;
   background: linear-gradient(135deg, #1a2a4a 0%, #0f1d36 100%);
   border: 1px solid #2c4a7c;
+}
+
+/* 胜负条件 */
+.win-condition {
+  position: absolute;
+  top: 16px;
+  left: 20px;
+  text-align: left;
+  z-index: 1;
+}
+
+.wc-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #f1c40f;
+  margin-bottom: 6px;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.4);
+}
+
+.wc-line {
+  font-size: 13px;
+  color: #f1c40f;
+  font-weight: 600;
+  line-height: 1.5;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+
+.wc-sub {
+  font-size: 11px;
+  color: rgba(241, 196, 15, 0.65);
+  line-height: 1.5;
+  margin-top: 2px;
 }
 
 /* 详情弹窗 */

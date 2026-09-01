@@ -4,7 +4,7 @@ import { rollDice, rollFixed } from './dice.js'
 import { drawCard } from './cards.js'
 import { fluctuateStock } from './stock.js'
 import { applyDepositInterest } from './bank.js'
-import { addItem, hasItem, useItem } from './items.js'
+import { addItem, hasItem, useItem, getItemName } from './items.js'
 import { addLog, getCurrentPlayer, calcNetWorth, ownsFullGroup, checkBankruptcy } from './gameState.js'
 import { aiFreeActions, aiDecideBuy } from './ai.js'
 
@@ -25,7 +25,7 @@ function movePlayer(state, player, steps) {
   // 经过起点获得工资
   if (newPos < oldPos && steps > 0) {
     player.money += START_SALARY
-    addLog(state, `${player.name} 经过起点，获得 ${START_SALARY} 元`)
+    addLog(state, `${player.name} 经过起点，获得 ${START_SALARY} 元`, player.color)
   }
   player.position = newPos
 }
@@ -35,7 +35,7 @@ function moveToPosition(state, player, position) {
   const oldPos = player.position
   if (position < oldPos) {
     player.money += START_SALARY
-    addLog(state, `${player.name} 经过起点，获得 ${START_SALARY} 元`)
+    addLog(state, `${player.name} 经过起点，获得 ${START_SALARY} 元`, player.color)
   }
   player.position = position
 }
@@ -88,7 +88,7 @@ async function handleTileEvent(state, player, diceTotal) {
 
   switch (tile.type) {
     case TILE_TYPES.GO:
-      addLog(state, `${player.name} 到达起点`)
+      addLog(state, `${player.name} 到达起点`, player.color)
       break
 
     case TILE_TYPES.PROPERTY:
@@ -108,7 +108,7 @@ async function handleTileEvent(state, player, diceTotal) {
             state.needAction = 'buy_property'
           }
         } else {
-          addLog(state, `${player.name} 资金不足，无法购买 ${tile.name}`)
+          addLog(state, `${player.name} 资金不足，无法购买 ${tile.name}`, player.color)
         }
       } else if (owner.id !== player.id && !owner.bankrupt) {
         // 支付租金
@@ -117,11 +117,11 @@ async function handleTileEvent(state, player, diceTotal) {
           // 检查免租牌
           if (hasItem(player, 'free_rent')) {
             useItem(player, 'free_rent')
-            addLog(state, `${player.name} 使用免租牌，免交 ${amount} 元租金`)
+            addLog(state, `${player.name} 使用免租牌，免交 ${amount} 元租金`, player.color)
           } else {
             player.money -= amount
             to.money += amount
-            addLog(state, `${player.name} 向 ${to.name} 支付 ${tile.name} 租金 ${amount} 元`)
+            addLog(state, `${player.name} 向 ${to.name} 支付 ${tile.name} 租金 ${amount} 元`, player.color)
           }
         }
       }
@@ -130,7 +130,7 @@ async function handleTileEvent(state, player, diceTotal) {
 
     case TILE_TYPES.CHANCE: {
       const card = drawCard(state.cardDecks, 'chance')
-      addLog(state, `${player.name} 抽到机会卡：${card.text}`)
+      addLog(state, `${player.name} 抽到机会卡：${card.text}`, player.color)
       state.pendingCard = card
       if (player.isAI) {
         await delay(500)
@@ -144,7 +144,7 @@ async function handleTileEvent(state, player, diceTotal) {
 
     case TILE_TYPES.DESTINY: {
       const card = drawCard(state.cardDecks, 'destiny')
-      addLog(state, `${player.name} 抽到命运卡：${card.text}`)
+      addLog(state, `${player.name} 抽到命运卡：${card.text}`, player.color)
       state.pendingCard = card
       if (player.isAI) {
         await delay(500)
@@ -158,7 +158,7 @@ async function handleTileEvent(state, player, diceTotal) {
 
     case TILE_TYPES.TAX:
       player.money -= tile.amount
-      addLog(state, `${player.name} 缴纳税款 ${tile.amount} 元`)
+      addLog(state, `${player.name} 缴纳税款 ${tile.amount} 元`, player.color)
       break
 
     case TILE_TYPES.GO_TO_JAIL:
@@ -166,11 +166,11 @@ async function handleTileEvent(state, player, diceTotal) {
       break
 
     case TILE_TYPES.JAIL:
-      addLog(state, `${player.name} 探访监狱`)
+      addLog(state, `${player.name} 探访监狱`, player.color)
       break
 
     case TILE_TYPES.FREE_PARKING:
-      addLog(state, `${player.name} 免费停车，休息一下`)
+      addLog(state, `${player.name} 免费停车，休息一下`, player.color)
       break
   }
 }
@@ -180,7 +180,7 @@ function sendToJail(state, player) {
   player.position = 10
   player.inJail = true
   player.jailTurns = 0
-  addLog(state, `${player.name} 被送进监狱！`)
+  addLog(state, `${player.name} 被送进监狱！`, player.color)
 }
 
 // 应用卡片效果
@@ -190,16 +190,16 @@ async function applyCardEffect(state, player, card, diceTotal) {
     case 'money':
       player.money += eff.amount
       if (eff.amount > 0) {
-        addLog(state, `${player.name} 获得 ${eff.amount} 元`)
+        addLog(state, `${player.name} 获得 ${eff.amount} 元`, player.color)
       } else {
-        addLog(state, `${player.name} 支付 ${Math.abs(eff.amount)} 元`)
+        addLog(state, `${player.name} 支付 ${Math.abs(eff.amount)} 元`, player.color)
       }
       break
 
     case 'move_to':
       state.movingPlayerId = player.id
       moveToPosition(state, player, eff.position)
-      addLog(state, `${player.name} 移动到 ${BOARD[eff.position].name}`)
+      addLog(state, `${player.name} 移动到 ${BOARD[eff.position].name}`, player.color)
       await delay(600)
       state.movingPlayerId = null
       await handleTileEvent(state, player, diceTotal)
@@ -208,7 +208,7 @@ async function applyCardEffect(state, player, card, diceTotal) {
     case 'move_back':
       state.movingPlayerId = player.id
       player.position = (player.position - eff.steps + 40) % 40
-      addLog(state, `${player.name} 后退 ${eff.steps} 格到 ${BOARD[player.position].name}`)
+      addLog(state, `${player.name} 后退 ${eff.steps} 格到 ${BOARD[player.position].name}`, player.color)
       await delay(600)
       state.movingPlayerId = null
       await handleTileEvent(state, player, diceTotal)
@@ -224,10 +224,10 @@ async function applyCardEffect(state, player, card, diceTotal) {
     case 'get_item':
       if (eff.item === 'jail_free') {
         player.jailFreeCards = (player.jailFreeCards || 0) + 1
-        addLog(state, `${player.name} 获得免费出狱卡`)
+        addLog(state, `${player.name} 获得免费出狱卡`, player.color)
       } else {
         addItem(player, eff.item)
-        addLog(state, `${player.name} 获得道具`)
+        addLog(state, `${player.name} 获得了 ${getItemName(eff.item)}`, player.color)
       }
       break
 
@@ -240,7 +240,7 @@ async function applyCardEffect(state, player, card, diceTotal) {
       }
       if (cost > 0) {
         player.money -= cost
-        addLog(state, `${player.name} 支付维修费 ${cost} 元`)
+        addLog(state, `${player.name} 支付维修费 ${cost} 元`, player.color)
       }
       break
     }
@@ -254,7 +254,7 @@ async function applyCardEffect(state, player, card, diceTotal) {
         }
       }
       player.money += total
-      addLog(state, `${player.name} 过生日，收到 ${total} 元`)
+      addLog(state, `${player.name} 过生日，收到 ${total} 元`, player.color)
       break
     }
   }
@@ -266,7 +266,7 @@ export function buyProperty(state, player, tile) {
   player.money -= tile.price
   // 使用数组替换而非 push，确保 Vue 响应式检测到变化
   player.properties = [...player.properties, tile.id]
-  addLog(state, `${player.name} 购买了 ${tile.name}，花费 ${tile.price} 元`)
+  addLog(state, `${player.name} 购买了 ${tile.name}，花费 ${tile.price} 元`, player.color)
   return true
 }
 
@@ -283,7 +283,7 @@ export function buildHouse(state, player, tileIndex) {
   player.buildings = { ...player.buildings, [tileIndex]: current + 1 }
   player.money -= tile.buildCost
   const label = current + 1 === 5 ? '酒店' : `${current + 1}栋房子`
-  addLog(state, `${player.name} 在 ${tile.name} 建造了${label}，花费 ${tile.buildCost} 元`)
+  addLog(state, `${player.name} 在 ${tile.name} 建造了${label}，花费 ${tile.buildCost} 元`, player.color)
   return true
 }
 
@@ -294,7 +294,7 @@ async function handleJailTurn(state, player, diceResult) {
     player.jailFreeCards--
     player.inJail = false
     player.jailTurns = 0
-    addLog(state, `${player.name} 使用免费出狱卡`)
+    addLog(state, `${player.name} 使用免费出狱卡`, player.color)
     return false // 不消耗骰子
   }
 
@@ -302,7 +302,7 @@ async function handleJailTurn(state, player, diceResult) {
   if (diceResult.isDouble) {
     player.inJail = false
     player.jailTurns = 0
-    addLog(state, `${player.name} 掷出双数，成功出狱！`)
+    addLog(state, `${player.name} 掷出双数，成功出狱！`, player.color)
     return false // 使用本次骰子移动
   }
 
@@ -312,11 +312,11 @@ async function handleJailTurn(state, player, diceResult) {
     player.money -= JAIL_FINE
     player.inJail = false
     player.jailTurns = 0
-    addLog(state, `${player.name} 缴纳 ${JAIL_FINE} 元罚款出狱`)
+    addLog(state, `${player.name} 缴纳 ${JAIL_FINE} 元罚款出狱`, player.color)
     return false
   }
 
-  addLog(state, `${player.name} 在监狱中 (第${player.jailTurns}回合)`)
+  addLog(state, `${player.name} 在监狱中 (第${player.jailTurns}回合)`, player.color)
   return true // 跳过本回合
 }
 
@@ -330,12 +330,12 @@ export async function executeTurn(state) {
   }
 
   state.animating = true
-  addLog(state, `--- ${player.name} 的回合 (第${state.turnCount}轮) ---`)
+  addLog(state, `--- ${player.name} 的回合 (第${state.turnCount}轮) ---`, player.color)
 
   // 存款利息
   const interest = applyDepositInterest(player)
   if (interest > 0) {
-    addLog(state, `${player.name} 获得存款利息 ${interest} 元`)
+    addLog(state, `${player.name} 获得存款利息 ${interest} 元`, player.color)
   }
 
   // 监狱处理
@@ -343,7 +343,7 @@ export async function executeTurn(state) {
   if (player.inJail) {
     diceResult = rollDice()
     state.currentDice = diceResult
-    addLog(state, `${player.name} 掷出 [${diceResult.d1}+${diceResult.d2}=${diceResult.total}]`)
+    addLog(state, `${player.name} 掷出 [${diceResult.d1}+${diceResult.d2}=${diceResult.total}]`, player.color)
 
     const skipTurn = await handleJailTurn(state, player, diceResult)
     if (skipTurn) {
@@ -358,7 +358,7 @@ export async function executeTurn(state) {
       // 用卡或罚款出狱，重新掷骰子
       diceResult = rollDice()
       state.currentDice = diceResult
-      addLog(state, `${player.name} 掷出 [${diceResult.d1}+${diceResult.d2}=${diceResult.total}]`)
+      addLog(state, `${player.name} 掷出 [${diceResult.d1}+${diceResult.d2}=${diceResult.total}]`, player.color)
     }
     // 如果是双数出狱，diceResult 已经是出狱时的骰子，直接用它移动
   } else {
@@ -370,13 +370,13 @@ export async function executeTurn(state) {
       diceResult = rollDice()
     }
     state.currentDice = diceResult
-    addLog(state, `${player.name} 掷出 [${diceResult.d1}+${diceResult.d2}=${diceResult.total}]`)
+    addLog(state, `${player.name} 掷出 [${diceResult.d1}+${diceResult.d2}=${diceResult.total}]`, player.color)
   }
 
   // 移动
   state.movingPlayerId = player.id
   await movePlayer(state, player, diceResult.total)
-  addLog(state, `${player.name} 移动到 ${BOARD[player.position].name}`)
+  addLog(state, `${player.name} 移动到 ${BOARD[player.position].name}`, player.color)
 
   await delay(600)
   state.movingPlayerId = null
@@ -403,12 +403,12 @@ export async function finishTurnProcessing(state, player, diceResult) {
   calcNetWorth(player, state.stocks, state.players)
   if (player.money < 0 && player.netWorth < 0) {
     player.bankrupt = true
-    addLog(state, `${player.name} 破产了！`)
+    addLog(state, `${player.name} 破产了！`, player.color)
     const alive = state.players.filter(p => !p.bankrupt)
     if (alive.length === 1) {
       state.winner = alive[0]
       state.phase = 'ended'
-      addLog(state, `游戏结束！${alive[0].name} 获胜！`)
+      addLog(state, `游戏结束！${alive[0].name} 获胜！`, alive[0].color)
       state.animating = false
       return
     }

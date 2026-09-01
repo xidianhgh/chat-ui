@@ -3,8 +3,11 @@ import { ITEM_NAMES } from './constants.js'
 
 // 获取道具
 export function addItem(player, itemType) {
-  player.items = player.items || []
-  player.items = [...player.items, itemType]
+  if (!player.items) {
+    player.items = []
+  }
+  player.items.push(itemType)
+  console.log(`[道具] ${player.name} 获得 ${ITEM_NAMES[itemType] || itemType}，当前道具:`, [...player.items])
 }
 
 // 使用道具

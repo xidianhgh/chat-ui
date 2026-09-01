@@ -245,7 +245,7 @@ async function onSkipBuy() {
   state.showPropertyModal = false
   state.pendingProperty = null
   state.needAction = null
-  addLog(state, `${player.name} 放弃购买`)
+  addLog(state, `${player.name} 放弃购买`, player.color)
   if (diceResult && state.phase === 'playing') {
     await finishTurnProcessing(state, player, diceResult)
   }
@@ -287,21 +287,23 @@ function onEndTurn() {
 function onBuyStock(stock) {
   const player = getCurrentPlayer(state)
   if (buyStock(player, stock, 1)) {
-    addLog(state, `${player.name} 买入 ${stock.name} 1股 @${stock.price}`)
+    addLog(state, `${player.name} 买入 ${stock.name} 1股 @${stock.price}`, player.color)
   }
 }
 
 function onSellStock(stock) {
   const player = getCurrentPlayer(state)
   if (sellStock(player, stock, 1)) {
-    addLog(state, `${player.name} 卖出 ${stock.name} 1股 @${stock.price}`)
+    addLog(state, `${player.name} 卖出 ${stock.name} 1股 @${stock.price}`, player.color)
   }
 }
 
 // 银行操作
 function onBankAction() {
   const player = getCurrentPlayer(state)
+  console.log('[银行操作] 计算前:', { money: player.money, bankLoan: player.bankLoan, netWorth: player.netWorth })
   calcNetWorth(player, state.stocks, state.players)
+  console.log('[银行操作] 计算后:', { netWorth: player.netWorth })
 }
 
 // 使用道具
@@ -316,7 +318,7 @@ function onUseItem(itemType) {
     if (num >= 2 && num <= 12) {
       useItem(player, 'dice_control')
       state.currentDice = rollFixed(num)
-      addLog(state, `${player.name} 使用遥控骰子，掷出 ${num}`)
+      addLog(state, `${player.name} 使用遥控骰子，掷出 ${num}`, player.color)
     }
   }
 }

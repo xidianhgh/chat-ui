@@ -4,7 +4,7 @@
     <div class="log-list" ref="logList">
       <div v-for="(log, idx) in logs" :key="idx" class="log-entry">
         <span class="log-time">{{ log.time }}</span>
-        <span class="log-msg">{{ log.message }}</span>
+        <span class="log-msg" :style="log.color ? { color: log.color } : {}">{{ log.message }}</span>
       </div>
     </div>
   </div>
