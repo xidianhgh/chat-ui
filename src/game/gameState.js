@@ -27,6 +27,8 @@ export function createGameState() {
     // 动画
     animating: false,
     movingPlayerId: null, // 正在移动的玩家ID，用于慧星尾拖效果
+    // 胜利规则：净资产率先达到该目标值即获胜（0 表示不启用）
+    targetNetWorth: 0,
     // 游戏结果
     winner: null
   })

@@ -418,7 +418,22 @@ export async function finishTurnProcessing(state, player, diceResult) {
       state.animating = false
       return
     }
+    // 所有人类玩家破产时游戏结束，由净资产最高的 AI 获胜
+    const aliveHumans = alive.filter(p => !p.isAI)
+    const aliveAI = alive.filter(p => p.isAI)
+    if (aliveHumans.length === 0 && aliveAI.length > 0) {
+      aliveAI.forEach(ai => calcNetWorth(ai, state.stocks, state.players))
+      const winner = aliveAI.reduce((max, ai) => (ai.netWorth > max.netWorth ? ai : max), aliveAI[0])
+      state.winner = winner
+      state.phase = 'ended'
+      addLog(state, `所有人类玩家破产，游戏结束！${winner.name} 以最高净资产 ${winner.netWorth} 元获胜！`, winner.color)
+      state.animating = false
+      return
+    }
   }
+
+  // 净资产目标胜利判定（股价波动前）：本回合玩家率先达标即获胜
+  if (checkNetWorthTargetWin(state, player)) return
 
   // 股票波动
   state.stocks = fluctuateStock(state.stocks)
@@ -431,8 +446,30 @@ export async function finishTurnProcessing(state, player, diceResult) {
     await aiFreeActions(state, player)
   }
 
+  // 净资产目标胜利判定（股价波动与 AI 自由操作后）：对所有未破产玩家再判定一次
+  if (state.phase === 'playing' && checkNetWorthTargetWin(state, player)) return
+
   await delay(500)
   nextPlayer(state)
+}
+
+// 净资产目标胜利判定：率先达到目标净资产者获胜（人类与 AI 均适用）
+// 每回合结束都会调用，重新计算所有未破产玩家的净资产（含最新股价）；
+// 有玩家达标即结束游戏，优先判定本回合行动的玩家，否则取达标者中净资产最高者
+function checkNetWorthTargetWin(state, currentPlayer) {
+  if (!(state.targetNetWorth > 0)) return false
+  const alive = state.players.filter(p => !p.bankrupt)
+  alive.forEach(p => calcNetWorth(p, state.stocks, state.players))
+  const reached = alive.filter(p => p.netWorth >= state.targetNetWorth)
+  if (reached.length === 0) return false
+  const winner = reached.includes(currentPlayer)
+    ? currentPlayer
+    : reached.reduce((max, p) => (p.netWorth > max.netWorth ? p : max), reached[0])
+  state.winner = winner
+  state.phase = 'ended'
+  addLog(state, `游戏结束！${winner.name} 净资产达到 ${winner.netWorth} 元（目标 ${state.targetNetWorth} 元），获胜！`, winner.color)
+  state.animating = false
+  return true
 }
 
 // 切换到下一个玩家
@@ -471,6 +508,9 @@ export async function confirmCard(state) {
 export function endTurn(state) {
   const player = getCurrentPlayer(state)
   calcNetWorth(player, state.stocks, state.players)
+
+  // 净资产目标胜利判定（手动结束回合路径同样每回合判定）
+  if (checkNetWorthTargetWin(state, player)) return
 
   nextPlayer(state)
 }

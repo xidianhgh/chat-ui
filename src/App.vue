@@ -16,7 +16,8 @@
 
       <!-- 中间：棋盘 -->
       <div class="main-area">
-        <Board :players="state.players" :movingPlayerId="state.movingPlayerId">
+        <Board :players="state.players" :movingPlayerId="state.movingPlayerId"
+               :targetNetWorth="state.targetNetWorth">
           <!-- 中心控制区 -->
           <div class="center-controls">
             <div class="turn-info">
@@ -151,9 +152,10 @@ const canEndTurn = computed(() => {
 })
 
 // 游戏开始
-async function onGameStart(humanCount, aiCount) {
+async function onGameStart(humanCount, aiCount, targetNetWorth) {
   state.players = initPlayers(humanCount, aiCount)
   state.stocks = initStocks()
+  state.targetNetWorth = targetNetWorth > 0 ? targetNetWorth : 0
   startGame(state)
   // 开始第一个玩家的回合
   await nextTick()
@@ -360,8 +362,10 @@ function getCardType() {
 function resetGame() {
   const humanCount = state.players.filter(p => !p.isAI).length
   const aiCount = state.players.filter(p => p.isAI).length
+  const targetNetWorth = state.targetNetWorth
   const newState = createGameState()
   Object.assign(state, newState)
+  state.targetNetWorth = targetNetWorth
   state.players = initPlayers(humanCount, aiCount)
   state.stocks = initStocks()
   startGame(state)

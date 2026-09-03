@@ -18,6 +18,18 @@
         </div>
       </div>
 
+      <div class="setup-section">
+        <label>净资产目标（率先达到即获胜，人类与 AI 均适用，0 = 不启用）</label>
+        <input
+          class="target-input"
+          type="number"
+          min="0"
+          step="1000"
+          placeholder="0 = 不启用"
+          v-model.number="targetNetWorth"
+        />
+      </div>
+
       <div class="setup-info">
         <span>总玩家：{{ humanCount + aiCount }}</span>
         <span v-if="humanCount + aiCount < 2" class="warning">至少需要2名玩家</span>
@@ -36,7 +48,7 @@
         </div>
       </div>
 
-      <button class="start-btn" :disabled="humanCount + aiCount < 2 || humanCount + aiCount > 4" @click="$emit('start', humanCount, aiCount)">
+      <button class="start-btn" :disabled="humanCount + aiCount < 2 || humanCount + aiCount > 4" @click="onStart">
         开始游戏
       </button>
     </div>
@@ -47,12 +59,20 @@
 import { ref } from 'vue'
 import { PLAYER_COLORS, PLAYER_NAMES } from '../game/constants.js'
 
-defineEmits(['start'])
+const emit = defineEmits(['start'])
 
 const humanCount = ref(1)
 const aiCount = ref(2)
+const targetNetWorth = ref(0)
 const colors = PLAYER_COLORS
 const names = PLAYER_NAMES
+
+function onStart() {
+  const target = Number.isFinite(targetNetWorth.value) && targetNetWorth.value > 0
+    ? Math.floor(targetNetWorth.value)
+    : 0
+  emit('start', humanCount.value, aiCount.value, target)
+}
 </script>
 
 <style scoped>
@@ -117,6 +137,28 @@ const names = PLAYER_NAMES
 
 .player-select button:hover {
   background: rgba(255,255,255,0.15);
+}
+
+.target-input {
+  width: 220px;
+  padding: 10px 14px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-radius: 12px;
+  background: rgba(255,255,255,0.05);
+  color: #fff;
+  font-size: 1em;
+  text-align: center;
+  outline: none;
+  transition: all 0.2s;
+}
+
+.target-input:focus {
+  border-color: #e74c3c;
+  box-shadow: 0 0 12px rgba(231,76,60,0.4);
+}
+
+.target-input::placeholder {
+  color: rgba(255,255,255,0.4);
 }
 
 .setup-info {

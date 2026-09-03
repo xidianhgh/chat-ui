@@ -18,6 +18,9 @@
         <div class="win-condition">
           <div class="wc-title">🏆 胜负条件</div>
           <div class="wc-line">所有其他玩家破产后，最后存活的玩家获胜</div>
+          <div class="wc-line">所有人类玩家破产时，净资产最高的 AI 获胜</div>
+          <div class="wc-line">或 净资产率先达到目标值的玩家获胜（人类与 AI 均适用）</div>
+          <div v-if="targetNetWorth > 0" class="wc-line wc-goal">🎯 净资产目标：{{ targetNetWorth }} 元</div>
           <div class="wc-sub">破产 = 现金为负 且 净资产为负</div>
           <div class="wc-sub">净资产 = 现金 + 存款 + 地产 + 股票 − 贷款</div>
         </div>
@@ -159,7 +162,8 @@ import Tile from './Tile.vue'
 
 const props = defineProps({
   players: Array,
-  movingPlayerId: { type: Number, default: null }
+  movingPlayerId: { type: Number, default: null },
+  targetNetWorth: { type: Number, default: 0 }
 })
 
 const emit = defineEmits(['tile-click'])
@@ -334,6 +338,12 @@ function tileDescription(tile) {
   color: rgba(241, 196, 15, 0.65);
   line-height: 1.5;
   margin-top: 2px;
+}
+
+/* 净资产目标（只读展示） */
+.wc-goal {
+  color: #2ecc71;
+  margin-top: 4px;
 }
 
 /* 详情弹窗 */
