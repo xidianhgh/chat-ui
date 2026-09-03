@@ -251,9 +251,13 @@ async function applyCardEffect(state, player, card, diceTotal) {
         if (p.id !== player.id && !p.bankrupt) {
           p.money -= eff.amount
           total += eff.amount
+          // 现金变化后立即刷新该玩家净资产显示
+          calcNetWorth(p, state.stocks, state.players)
         }
       }
       player.money += total
+      // 刷新寿星净资产显示
+      calcNetWorth(player, state.stocks, state.players)
       addLog(state, `${player.name} 过生日，收到 ${total} 元`, player.color)
       break
     }
