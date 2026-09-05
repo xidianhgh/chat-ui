@@ -21,85 +21,216 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
 
+# ---------------------------------------------------------------------------
+# 绿色主题配色方案
+# ---------------------------------------------------------------------------
+COLOR_BG         = "#eef6ee"   # 主窗口背景（浅绿）
+COLOR_CARD       = "#ffffff"   # 卡片背景
+COLOR_BORDER     = "#c8e6c9"   # 边框 / 分隔线（浅绿）
+COLOR_HEADER_BG  = "#2e7d32"   # 顶部横幅（深绿）
+COLOR_HEADER_FG  = "#ffffff"   # 顶部标题文字
+COLOR_HEADER_SUB = "#d3ecd5"   # 顶部副标题文字
+COLOR_ACCENT     = "#43a047"   # 主色（绿）
+COLOR_ACCENT_HV  = "#388e3c"   # 主色 hover
+COLOR_ACCENT_DK  = "#1b5e20"   # 深绿（强调文字）
+COLOR_TEXT       = "#1f3d22"   # 正文（深绿黑）
+COLOR_MUTED      = "#5f7d62"   # 次要文字
+COLOR_LOG_BG     = "#0e2417"   # 日志区背景（深绿黑，终端风）
+COLOR_LOG_FG     = "#c8e6c9"   # 日志默认文字
+COLOR_LOG_TITLE  = "#388e3c"   # 日志区标题栏
+
+FONT_FAMILY = "Microsoft YaHei UI"
+FONT_MONO   = "Consolas"
+
+
 class GitSyncApp:
     """Git 分支同步图形界面应用"""
 
     def __init__(self, root: tk.Tk):
         self.root = root
         self.root.title("Git 分支同步工具")
-        self.root.geometry("760x560")
-        self.root.minsize(640, 460)
+        self.root.geometry("820x620")
+        self.root.minsize(720, 540)
+        self.root.configure(bg=COLOR_BG)
 
         # 用于工作线程与主线程之间安全地传递日志/状态
         self.log_queue = queue.Queue()
         self.is_running = False
 
+        self._setup_style()
         self._build_widgets()
         # 定时从队列中取出日志刷新到界面
         self.root.after(100, self._process_log_queue)
 
     # ------------------------------------------------------------------ #
+    # 样式配置（绿色主题）
+    # ------------------------------------------------------------------ #
+    def _setup_style(self):
+        """基于 clam 主题定制绿色主题样式"""
+        style = ttk.Style(self.root)
+        try:
+            style.theme_use("clam")
+        except tk.TclError:
+            pass
+
+        base_font = (FONT_FAMILY, 10)
+        style.configure(".", background=COLOR_BG, foreground=COLOR_TEXT,
+                        font=base_font, bordercolor=COLOR_BORDER)
+
+        # 容器
+        style.configure("TFrame", background=COLOR_BG)
+        style.configure("Card.TFrame", background=COLOR_CARD, borderwidth=1,
+                        relief="solid", bordercolor=COLOR_BORDER)
+        style.configure("CardFlat.TFrame", background=COLOR_CARD, borderwidth=0)
+        style.configure("Header.TFrame", background=COLOR_HEADER_BG)
+        style.configure("LogTitle.TFrame", background=COLOR_LOG_TITLE)
+
+        # 标签
+        style.configure("TLabel", background=COLOR_BG, foreground=COLOR_TEXT, font=base_font)
+        style.configure("Card.TLabel", background=COLOR_CARD, foreground=COLOR_MUTED,
+                        font=(FONT_FAMILY, 9))
+        style.configure("CardTitle.TLabel", background=COLOR_CARD, foreground=COLOR_ACCENT_DK,
+                        font=(FONT_FAMILY, 11, "bold"))
+        style.configure("HeaderTitle.TLabel", background=COLOR_HEADER_BG, foreground=COLOR_HEADER_FG,
+                        font=(FONT_FAMILY, 17, "bold"))
+        style.configure("HeaderSub.TLabel", background=COLOR_HEADER_BG, foreground=COLOR_HEADER_SUB,
+                        font=(FONT_FAMILY, 9))
+        style.configure("LogTitle.TLabel", background=COLOR_LOG_TITLE, foreground="#ffffff",
+                        font=(FONT_FAMILY, 10, "bold"))
+        style.configure("Status.TLabel", background=COLOR_BG, foreground=COLOR_MUTED,
+                        font=(FONT_FAMILY, 9))
+
+        # 输入框
+        style.configure("TEntry", fieldbackground="#ffffff", foreground=COLOR_TEXT,
+                        insertcolor=COLOR_TEXT, bordercolor=COLOR_BORDER, lightcolor=COLOR_BORDER,
+                        darkcolor=COLOR_BORDER, padding=6, font=base_font)
+        style.map("TEntry", bordercolor=[("focus", COLOR_ACCENT)],
+                  lightcolor=[("focus", COLOR_ACCENT)], darkcolor=[("focus", COLOR_ACCENT)])
+
+        # 主按钮（绿色实心）
+        style.configure("Accent.TButton", background=COLOR_ACCENT, foreground="#ffffff",
+                        borderwidth=0, focuscolor=COLOR_ACCENT, font=(FONT_FAMILY, 11, "bold"),
+                        padding=(24, 9))
+        style.map("Accent.TButton",
+                  background=[("active", COLOR_ACCENT_HV), ("pressed", COLOR_ACCENT_DK),
+                              ("disabled", "#a5d6a7")],
+                  foreground=[("disabled", "#eef6ee")])
+
+        # 次要按钮（白底绿边）
+        style.configure("TButton", background="#ffffff", foreground=COLOR_ACCENT_DK,
+                        bordercolor=COLOR_BORDER, borderwidth=1, focuscolor=COLOR_CARD,
+                        font=base_font, padding=(14, 7))
+        style.map("TButton",
+                  background=[("active", "#e8f5e9"), ("pressed", "#dcedc8"), ("disabled", "#f4f4f4")],
+                  foreground=[("disabled", "#a8a8a8")],
+                  bordercolor=[("active", COLOR_ACCENT)])
+
+        # 复选框
+        style.configure("TCheckbutton", background=COLOR_CARD, foreground=COLOR_TEXT,
+                        font=base_font, focuscolor=COLOR_CARD)
+        style.map("TCheckbutton", background=[("active", COLOR_CARD)],
+                  indicatorcolor=[("selected", COLOR_ACCENT), ("!selected", "#ffffff")])
+
+        # 进度条
+        style.configure("Horizontal.TProgressbar", troughcolor="#dcedc8", background=COLOR_ACCENT,
+                        bordercolor=COLOR_BORDER, lightcolor=COLOR_ACCENT, darkcolor=COLOR_ACCENT,
+                        thickness=12)
+
+        # 滚动条
+        style.configure("Vertical.TScrollbar", troughcolor="#e8f5e9", background="#a5d6a7",
+                        bordercolor=COLOR_BG, arrowcolor=COLOR_ACCENT_DK, relief="flat")
+        style.map("Vertical.TScrollbar", background=[("active", COLOR_ACCENT)])
+
+    # ------------------------------------------------------------------ #
     # 界面构建
     # ------------------------------------------------------------------ #
     def _build_widgets(self):
-        pad = {"padx": 10, "pady": 6}
+        # ---------- 顶部标题横幅 ----------
+        header = ttk.Frame(self.root, style="Header.TFrame")
+        header.pack(fill="x")
+        ttk.Label(header, text="Git 分支同步工具", style="HeaderTitle.TLabel").pack(
+            anchor="w", padx=22, pady=(16, 2))
+        ttk.Label(header, text="把本地仓库的所有分支同步到目标 Git 地址，且不改动本地远程配置与分支",
+                  style="HeaderSub.TLabel").pack(anchor="w", padx=22, pady=(0, 16))
 
-        # 顶部输入区
-        form = ttk.Frame(self.root)
-        form.pack(fill="x", **pad)
-        form.columnconfigure(1, weight=1)
+        # ---------- 主体区域 ----------
+        body = ttk.Frame(self.root)
+        body.pack(fill="both", expand=True, padx=18, pady=16)
 
-        # 目标 Git 地址
-        ttk.Label(form, text="目标 Git 地址：").grid(row=0, column=0, sticky="e", pady=6)
+        # 卡片一：仓库配置
+        card1 = ttk.Frame(body, style="Card.TFrame", padding=18)
+        card1.pack(fill="x")
+        ttk.Label(card1, text="仓库配置", style="CardTitle.TLabel").pack(anchor="w", pady=(0, 10))
+
+        ttk.Label(card1, text="目标 Git 地址", style="Card.TLabel").pack(anchor="w")
         self.url_var = tk.StringVar()
-        self.url_entry = ttk.Entry(form, textvariable=self.url_var)
-        self.url_entry.grid(row=0, column=1, columnspan=2, sticky="we", pady=6, padx=(0, 6))
+        self.url_entry = ttk.Entry(card1, textvariable=self.url_var)
+        self.url_entry.pack(fill="x", pady=(4, 12))
 
-        # 本地 Git 仓库目录
-        ttk.Label(form, text="本地仓库目录：").grid(row=1, column=0, sticky="e", pady=6)
+        ttk.Label(card1, text="本地仓库目录", style="Card.TLabel").pack(anchor="w")
+        dir_row = ttk.Frame(card1, style="CardFlat.TFrame")
+        dir_row.pack(fill="x", pady=(4, 0))
         self.dir_var = tk.StringVar()
-        self.dir_entry = ttk.Entry(form, textvariable=self.dir_var)
-        self.dir_entry.grid(row=1, column=1, sticky="we", pady=6)
-        self.browse_btn = ttk.Button(form, text="浏览...", command=self._choose_dir)
-        self.browse_btn.grid(row=1, column=2, sticky="e", pady=6, padx=(6, 0))
+        self.dir_entry = ttk.Entry(dir_row, textvariable=self.dir_var)
+        self.dir_entry.pack(side="left", fill="x", expand=True)
+        self.browse_btn = ttk.Button(dir_row, text="浏览...", command=self._choose_dir)
+        self.browse_btn.pack(side="left", padx=(8, 0))
 
-        # 选项区
-        opt = ttk.Frame(self.root)
-        opt.pack(fill="x", padx=10)
+        # 卡片二：同步选项
+        card2 = ttk.Frame(body, style="Card.TFrame", padding=18)
+        card2.pack(fill="x", pady=(14, 0))
+        ttk.Label(card2, text="同步选项", style="CardTitle.TLabel").pack(anchor="w", pady=(0, 8))
         self.force_var = tk.BooleanVar(value=False)
         self.tags_var = tk.BooleanVar(value=False)
         ttk.Checkbutton(
-            opt, text="强制推送 (--force，覆盖目标端冲突分支)", variable=self.force_var
-        ).pack(side="left", padx=(0, 20))
+            card2, text="强制推送 (--force)：覆盖目标端冲突分支，可能导致目标端数据丢失",
+            variable=self.force_var).pack(anchor="w", pady=2)
         ttk.Checkbutton(
-            opt, text="同时同步标签 (--tags)", variable=self.tags_var
-        ).pack(side="left")
+            card2, text="同时同步标签 (--tags)", variable=self.tags_var).pack(anchor="w", pady=2)
 
-        # 操作按钮区
-        btns = ttk.Frame(self.root)
-        btns.pack(fill="x", **pad)
-        self.sync_btn = ttk.Button(btns, text="同步", command=self._on_sync_clicked)
+        # 操作区：按钮 + 状态
+        action = ttk.Frame(body)
+        action.pack(fill="x", pady=(16, 10))
+        self.sync_btn = ttk.Button(action, text="同 步", style="Accent.TButton",
+                                   command=self._on_sync_clicked)
         self.sync_btn.pack(side="left")
-        self.clear_btn = ttk.Button(btns, text="清空日志", command=self._clear_log)
-        self.clear_btn.pack(side="left", padx=8)
+        self.clear_btn = ttk.Button(action, text="清空日志", command=self._clear_log)
+        self.clear_btn.pack(side="left", padx=(10, 0))
+        self.status_var = tk.StringVar(value="就绪")
+        ttk.Label(action, textvariable=self.status_var, style="Status.TLabel").pack(side="right")
 
         # 进度条
-        self.progress = ttk.Progressbar(self.root, mode="indeterminate")
-        self.progress.pack(fill="x", padx=10)
+        self.progress = ttk.Progressbar(body, mode="indeterminate",
+                                        style="Horizontal.TProgressbar")
+        self.progress.pack(fill="x", pady=(0, 12))
 
-        # 日志输出区
-        log_frame = ttk.Frame(self.root)
-        log_frame.pack(fill="both", expand=True, padx=10, pady=(6, 4))
-        self.log_text = tk.Text(log_frame, wrap="word", state="disabled", height=15)
-        scrollbar = ttk.Scrollbar(log_frame, command=self.log_text.yview)
+        # 日志卡片（终端风格）
+        log_card = ttk.Frame(body, style="Card.TFrame")
+        log_card.pack(fill="both", expand=True)
+        log_title = ttk.Frame(log_card, style="LogTitle.TFrame")
+        log_title.pack(fill="x")
+        ttk.Label(log_title, text="同步日志", style="LogTitle.TLabel").pack(
+            side="left", padx=12, pady=6)
+
+        log_body = tk.Frame(log_card, bg=COLOR_LOG_BG)
+        log_body.pack(fill="both", expand=True)
+        self.log_text = tk.Text(log_body, wrap="word", state="disabled", bg=COLOR_LOG_BG,
+                                fg=COLOR_LOG_FG, insertbackground=COLOR_LOG_FG, relief="flat",
+                                padx=12, pady=10, font=(FONT_MONO, 10), spacing1=1, spacing3=1)
+        scrollbar = ttk.Scrollbar(log_body, command=self.log_text.yview,
+                                  style="Vertical.TScrollbar")
         self.log_text.configure(yscrollcommand=scrollbar.set)
         scrollbar.pack(side="right", fill="y")
         self.log_text.pack(side="left", fill="both", expand=True)
 
-        # 状态栏
-        self.status_var = tk.StringVar(value="就绪")
-        status_bar = ttk.Label(self.root, textvariable=self.status_var, anchor="w")
-        status_bar.pack(fill="x", side="bottom", padx=10, pady=(0, 6))
+        # 日志着色标签
+        self.log_text.tag_configure("plain", foreground=COLOR_LOG_FG)
+        self.log_text.tag_configure("cmd", foreground="#4dd0b1")
+        self.log_text.tag_configure("error", foreground="#ff6b6b")
+        self.log_text.tag_configure("warn", foreground="#ffca6b")
+        self.log_text.tag_configure("success", foreground="#69f0ae")
+        self.log_text.tag_configure("info", foreground="#a5d6a7")
+        self.log_text.tag_configure("sep", foreground="#66bb6a")
 
     # ------------------------------------------------------------------ #
     # 事件处理
@@ -304,9 +435,29 @@ class GitSyncApp:
         # 继续轮询
         self.root.after(100, self._process_log_queue)
 
+    def _log_tag_for(self, message: str) -> str:
+        """根据日志内容判断着色标签"""
+        m = message.strip()
+        if not m:
+            return "plain"
+        if m.startswith("$ "):
+            return "cmd"
+        if m.startswith("[错误]") or m.startswith("[异常]"):
+            return "error"
+        if m.startswith("[警告]"):
+            return "warn"
+        if m.startswith("[成功]") or m.startswith("[完成]"):
+            return "success"
+        if m.startswith("[信息]") or m.startswith("[步骤]") or m.startswith("[核对]"):
+            return "info"
+        if set(m) <= set("=") or m.startswith("====="):
+            return "sep"
+        return "plain"
+
     def _append_log(self, message: str):
+        tag = self._log_tag_for(message)
         self.log_text.configure(state="normal")
-        self.log_text.insert("end", message + "\n")
+        self.log_text.insert("end", message + "\n", tag)
         self.log_text.see("end")
         self.log_text.configure(state="disabled")
 
@@ -333,15 +484,6 @@ class GitSyncApp:
 
 def main():
     root = tk.Tk()
-    # 使用系统原生主题（若可用）
-    try:
-        style = ttk.Style()
-        if "vista" in style.theme_names():
-            style.theme_use("vista")
-        elif "clam" in style.theme_names():
-            style.theme_use("clam")
-    except tk.TclError:
-        pass
     GitSyncApp(root)
     root.mainloop()
 
