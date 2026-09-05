@@ -1,2 +1,4 @@
 # 忽略整个 .idea 目录（IDEA全部配置）
 .idea/
+dist
+node_modules
