@@ -13,6 +13,10 @@ Git 分支同步工具
     - 同步过程统一采用“直接推送到 URL”方式（`git push <url> ...`），
       不会新增/修改本地仓库的 remote 配置，也不会改动本地分支，
       因此同步完成后本地仓库的远程地址与分支保持原样不变。
+    - 另提供可选的“源 Git 远程仓地址”：填写后进入“远程仓 → 远程仓”模式，
+      通过临时裸仓库中转（clone --bare 后 push），把源仓分支同步到目标地址，
+      全程不依赖也不改动任何本地仓库。填写源地址后会额外显示“源仓库分支”
+      输入框：留空则同步源仓所有分支；填写则只把该分支同步到目标仓库的同名分支。
 
 仅依赖 Python 标准库（tkinter + subprocess），无需安装第三方包。
 """
@@ -21,6 +25,7 @@ import os
 import queue
 import shutil
 import subprocess
+import tempfile
 import threading
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
@@ -256,8 +261,36 @@ class GitSyncApp:
         self.url_entry = ttk.Entry(card1, textvariable=self.url_var)
         self.url_entry.pack(fill="x", pady=(4, 12))
 
-        ttk.Label(card1, text="本地仓库目录", style="Card.TLabel").pack(anchor="w")
-        dir_row = ttk.Frame(card1, style="CardFlat.TFrame")
+        ttk.Label(card1, text="源 Git 远程仓地址（可选）", style="Card.TLabel").pack(anchor="w")
+        self.source_url_var = tk.StringVar()
+        self.source_url_entry = ttk.Entry(card1, textvariable=self.source_url_var)
+        self.source_url_entry.pack(fill="x", pady=(4, 2))
+        ttk.Label(
+            card1,
+            text="填写后进入“远程仓→远程仓”模式：忽略本地仓库配置，把源仓分支同步到目标地址。下方会出现“源仓库分支”输入框（留空则同步全部分支）。",
+            style="Card.TLabel", wraplength=LEFT_WIDTH - 40, justify="left").pack(
+            anchor="w", pady=(0, 12))
+
+        # 源仓库分支（仅在“远程仓→远程仓”模式下显示，默认隐藏）
+        self.source_branch_row = ttk.Frame(card1, style="CardFlat.TFrame")
+        ttk.Label(self.source_branch_row, text="源仓库分支（可选）",
+                  style="Card.TLabel").pack(anchor="w")
+        self.source_branch_var = tk.StringVar()
+        self.source_branch_entry = ttk.Entry(self.source_branch_row,
+                                             textvariable=self.source_branch_var)
+        self.source_branch_entry.pack(fill="x", pady=(2, 0))
+        ttk.Label(
+            self.source_branch_row,
+            text="留空→把源仓所有分支同步到目标仓库；填写→只把源仓的该分支同步到目标仓库的同名分支。",
+            style="Card.TLabel", wraplength=LEFT_WIDTH - 40, justify="left").pack(
+            anchor="w", pady=(4, 0))
+
+        # 本地仓库相关配置（仅在本地仓库模式下显示）
+        self.local_block = ttk.Frame(card1, style="CardFlat.TFrame")
+        self.local_block.pack(fill="x")
+
+        ttk.Label(self.local_block, text="本地仓库目录", style="Card.TLabel").pack(anchor="w")
+        dir_row = ttk.Frame(self.local_block, style="CardFlat.TFrame")
         dir_row.pack(fill="x", pady=(4, 0))
         self.dir_var = tk.StringVar()
         self.dir_entry = ttk.Entry(dir_row, textvariable=self.dir_var)
@@ -266,9 +299,9 @@ class GitSyncApp:
         self.browse_btn.pack(side="left", padx=(8, 0))
 
         # 分支设置（两个输入框均为可选）
-        ttk.Label(card1, text="分支设置（均可留空）", style="Card.TLabel").pack(
+        ttk.Label(self.local_block, text="分支设置（均可留空）", style="Card.TLabel").pack(
             anchor="w", pady=(14, 0))
-        branch_row = ttk.Frame(card1, style="CardFlat.TFrame")
+        branch_row = ttk.Frame(self.local_block, style="CardFlat.TFrame")
         branch_row.pack(fill="x", pady=(4, 0))
 
         left_col = ttk.Frame(branch_row, style="CardFlat.TFrame")
@@ -286,11 +319,15 @@ class GitSyncApp:
         self.target_branch_entry.pack(fill="x", pady=(2, 0))
 
         ttk.Label(
-            card1,
+            self.local_block,
             text="规则：都留空→推送全部分支；仅填目标→当前分支推送到目标分支；"
                  "都填→本地分支推送到目标分支；仅填本地→推送到目标同名分支。",
             style="Card.TLabel", wraplength=LEFT_WIDTH - 40, justify="left").pack(
             anchor="w", pady=(8, 0))
+
+        # 监听源地址变化，动态切换“源仓分支”与“本地仓库配置”的显示
+        self._remote_mode = False
+        self.source_url_var.trace_add("write", self._on_source_url_change)
 
         # 卡片二：同步选项
         card2 = ttk.Frame(left, style="Card.TFrame", padding=18)
@@ -367,6 +404,22 @@ class GitSyncApp:
         if chosen:
             self.dir_var.set(chosen)
 
+    def _on_source_url_change(self, *args):
+        """源地址变化时切换模式：
+        填写→远程仓模式（显示“源仓库分支”、隐藏本地仓库配置）；
+        留空→本地仓库模式（反之）。
+        """
+        remote = bool(self.source_url_var.get().strip())
+        if remote == self._remote_mode:
+            return
+        self._remote_mode = remote
+        if remote:
+            self.local_block.pack_forget()
+            self.source_branch_row.pack(fill="x")
+        else:
+            self.source_branch_row.pack_forget()
+            self.local_block.pack(fill="x")
+
     def _on_sync_clicked(self):
         """点击同步按钮"""
         if self.is_running:
@@ -377,17 +430,21 @@ class GitSyncApp:
         local_dir = self.dir_var.get().strip()
         local_branch = self.local_branch_var.get().strip()
         target_branch = self.target_branch_var.get().strip()
+        source_url = self.source_url_var.get().strip()
+        source_branch = self.source_branch_var.get().strip()
 
         # 基本校验
         if not url:
             messagebox.showwarning("输入有误", "请填写目标 Git 地址。")
             return
-        if not local_dir:
-            messagebox.showwarning("输入有误", "请填写本地 Git 仓库目录。")
-            return
-        if not os.path.isdir(local_dir):
-            messagebox.showerror("目录不存在", f"本地目录不存在：\n{local_dir}")
-            return
+        if not source_url:
+            # 未填源仓地址 → 本地仓库模式，必须提供有效的本地目录
+            if not local_dir:
+                messagebox.showwarning("输入有误", "请填写本地 Git 仓库目录，或填写源 Git 远程仓地址。")
+                return
+            if not os.path.isdir(local_dir):
+                messagebox.showerror("目录不存在", f"本地目录不存在：\n{local_dir}")
+                return
 
         # 确认强制推送风险
         if self.force_var.get():
@@ -404,7 +461,7 @@ class GitSyncApp:
         worker = threading.Thread(
             target=self._sync_worker,
             args=(url, local_dir, self.force_var.get(), self.tags_var.get(),
-                  local_branch, target_branch),
+                  local_branch, target_branch, source_url, source_branch),
             daemon=True,
         )
         worker.start()
@@ -413,25 +470,39 @@ class GitSyncApp:
     # 后台同步逻辑
     # ------------------------------------------------------------------ #
     def _sync_worker(self, url: str, local_dir: str, force: bool, sync_tags: bool,
-                     local_branch: str = "", target_branch: str = ""):
+                     local_branch: str = "", target_branch: str = "",
+                     source_url: str = "", source_branch: str = ""):
         try:
             self._log("=" * 60)
             self._log("开始同步...")
             self._log(f"目标 Git 地址 : {url}")
-            self._log(f"本地仓库目录 : {local_dir}")
-            self._log(f"本地分支     : {local_branch or '(未指定)'}")
-            self._log(f"目标分支     : {target_branch or '(未指定)'}")
+            if source_url:
+                self._log(f"源 Git 远程仓 : {source_url}")
+                self._log(f"源仓分支     : {source_branch or '(未指定，默认全部)'}")
+                self._log("同步模式     : 远程仓 → 远程仓")
+            else:
+                self._log(f"本地仓库目录 : {local_dir}")
+                self._log(f"本地分支     : {local_branch or '(未指定)'}")
+                self._log(f"目标分支     : {target_branch or '(未指定)'}")
             self._log(f"强制推送     : {'是' if force else '否'}")
             self._log(f"同步标签     : {'是' if sync_tags else '否'}")
             self._log("=" * 60)
 
             # 0. 检查 git 是否可用
+            self._set_status("正在检查环境...")
             if shutil.which("git") is None:
                 self._log("[错误] 未检测到 git 命令，请先安装 Git 并配置到系统 PATH。")
                 self._finish(False)
                 return
 
+            # 0.5 远程仓 → 远程仓模式：填写了源地址时走独立流程
+            if source_url:
+                self._sync_remote_to_remote(source_url, url, force, sync_tags,
+                                            source_branch, source_branch)
+                return
+
             # 1. 校验是否为 git 仓库
+            self._set_status("正在校验本地仓库...")
             ok, out = self._run_git(["rev-parse", "--is-inside-work-tree"], local_dir)
             if not ok or out.strip() != "true":
                 self._log(f"[错误] 该目录不是有效的 Git 仓库：\n{out}")
@@ -450,6 +521,7 @@ class GitSyncApp:
             # 3. 推送到目标 URL
             #    统一采用“直接推送到 URL”的方式（git push <url> ...），
             #    不会新增/修改本地 remote 配置，也不会改动本地分支。
+            self._set_status("正在推送分支...")
             if not local_branch and not target_branch:
                 # 两个分支都留空：推送所有本地分支（原逻辑）
                 self._log("\n[步骤] 未指定分支，正在推送所有分支到目标地址 ...")
@@ -474,6 +546,7 @@ class GitSyncApp:
             # 4. 可选：同步标签
             tag_result = "未同步"
             if sync_tags:
+                self._set_status("正在推送标签...")
                 self._log("\n[步骤] 正在推送标签 (--tags) ...")
                 tag_cmd = ["push", url, "--tags"]
                 if force:
@@ -486,6 +559,7 @@ class GitSyncApp:
                     tag_result = "已同步"
 
             # 5. 核对本地 remote 与分支是否保持原样
+            self._set_status("正在核对本地仓库...")
             self._log("\n[核对] 同步后的远程仓库配置 (git remote -v)：")
             _, remotes_after = self._run_git(["remote", "-v"], local_dir)
             self._log(remotes_after.strip() or "  (无远程仓库配置)")
@@ -527,6 +601,107 @@ class GitSyncApp:
         except Exception as exc:  # 兜底异常处理
             self._log(f"\n[异常] 同步过程中发生未预期的错误：{exc}")
             self._finish(False)
+
+    def _sync_remote_to_remote(self, source_url: str, target_url: str,
+                               force: bool, sync_tags: bool,
+                               source_branch: str = "", target_branch: str = ""):
+        """远程仓 → 远程仓同步：把源远程仓的分支同步到目标远程仓。
+
+        通过临时裸仓库中转（先 `git clone --bare <源>`，再在裸仓库内
+        `git push <目标> ...`），全程不依赖也不改动任何本地工作仓库，
+        结束后自动清理临时目录。
+        默认推送源仓所有分支；若指定 source_branch/target_branch，则只推送
+        对应分支（源分支留空表示源仓默认分支 HEAD）。
+        """
+        tmp_root = tempfile.mkdtemp(prefix="gitsync_")
+        repo_dir = os.path.join(tmp_root, "repo.git")
+        try:
+            # 1. 克隆源仓库为裸仓库
+            self._set_status("正在克隆源仓库...")
+            self._log("\n[步骤] 正在从源仓库克隆 (--bare) 到临时目录 ...")
+            ok, _ = self._run_git(["clone", "--bare", source_url, repo_dir],
+                                  tmp_root, stream=True)
+            if not ok:
+                self._log("\n[错误] 克隆源仓库失败，请检查源地址、网络连接或访问权限。")
+                self._finish(False)
+                return
+
+            # 2. 推送分支到目标地址
+            self._set_status("正在推送分支...")
+            if not source_branch and not target_branch:
+                # 未指定分支：推送源仓所有分支
+                self._log("\n[步骤] 未指定分支，正在把源仓库所有分支推送到目标地址 ...")
+                push_cmd = ["push", target_url, "--all"]
+                push_desc = "源仓库所有分支"
+            else:
+                # 指定分支：源分支留空则用源仓默认分支 HEAD，目标分支留空则与源同名
+                src = source_branch if source_branch else "HEAD"
+                dst = target_branch if target_branch else source_branch
+                src_desc = source_branch if source_branch else "源仓默认分支(HEAD)"
+                self._log(f"\n[步骤] 正在推送分支：{src_desc} -> 目标分支 {dst} ...")
+                push_cmd = ["push", target_url, f"{src}:refs/heads/{dst}"]
+                push_desc = f"{src_desc} → 目标分支 {dst}"
+            if force:
+                push_cmd.append("--force")
+            ok, _ = self._run_git(push_cmd, repo_dir, stream=True)
+            if not ok:
+                self._log("\n[错误] 分支推送失败，请检查上方输出（常见原因：地址错误、无权限、需要认证、分支不存在或存在冲突）。")
+                self._finish(False)
+                return
+
+            # 3. 可选：同步标签
+            tag_result = "未同步"
+            if sync_tags:
+                self._set_status("正在推送标签...")
+                self._log("\n[步骤] 正在推送标签 (--tags) ...")
+                tag_cmd = ["push", target_url, "--tags"]
+                if force:
+                    tag_cmd.append("--force")
+                ok, _ = self._run_git(tag_cmd, repo_dir, stream=True)
+                if ok:
+                    tag_result = "已同步"
+                else:
+                    tag_result = "推送失败（分支已成功）"
+                    self._log("\n[警告] 标签推送失败，但分支已推送完成。")
+
+            # 4. 成功明细
+            self._log("\n[成功] 远程仓 → 远程仓同步完成，明细如下：")
+            self._log(f"        源仓库   ： {source_url}")
+            self._log(f"        目标地址 ： {target_url}")
+            self._log(f"        推送内容 ： {push_desc}")
+            self._log(f"        强制推送 ： {'是' if force else '否'}")
+            self._log(f"        标签同步 ： {tag_result}")
+            summary = (
+                "远程仓同步已完成！\n\n"
+                f"源仓库：{source_url}\n"
+                f"目标地址：{target_url}\n"
+                f"推送内容：{push_desc}\n"
+                f"强制推送：{'是' if force else '否'}\n"
+                f"标签同步：{tag_result}"
+            )
+            self._finish(True, summary)
+
+        except Exception as exc:
+            self._log(f"\n[异常] 远程仓同步过程中发生错误：{exc}")
+            self._finish(False)
+        finally:
+            self._cleanup_temp(tmp_root)
+
+    def _cleanup_temp(self, path: str):
+        """删除临时目录，兼容 Windows 下 git 对象文件只读的情况。"""
+        def _on_error(func, p, exc):
+            try:
+                os.chmod(p, 0o600)
+                func(p)
+            except OSError:
+                pass
+        try:
+            shutil.rmtree(path, onexc=_on_error)
+        except TypeError:
+            # 兼容不支持 onexc 的旧版本
+            shutil.rmtree(path, onerror=_on_error)
+        except OSError:
+            pass
 
     def _run_git(self, args, cwd, stream=False):
         """
@@ -582,6 +757,10 @@ class GitSyncApp:
         """线程安全地写日志（放入队列由主线程刷新）"""
         self.log_queue.put(("log", message))
 
+    def _set_status(self, text: str):
+        """线程安全地更新状态栏文字（放入队列由主线程刷新）"""
+        self.log_queue.put(("status", text))
+
     def _process_log_queue(self):
         """主线程定时消费日志队列，更新界面"""
         try:
@@ -589,6 +768,8 @@ class GitSyncApp:
                 kind, payload = self.log_queue.get_nowait()
                 if kind == "log":
                     self._append_log(payload)
+                elif kind == "status":
+                    self.status_var.set(payload)
                 elif kind == "finish":
                     self._set_running(False)
                     success, summary = payload
@@ -644,6 +825,8 @@ class GitSyncApp:
         self.browse_btn.configure(state=state)
         self.clear_btn.configure(state=state)
         self.url_entry.configure(state=state)
+        self.source_url_entry.configure(state=state)
+        self.source_branch_entry.configure(state=state)
         self.dir_entry.configure(state=state)
         self.local_branch_entry.configure(state=state)
         self.target_branch_entry.configure(state=state)
