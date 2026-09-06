@@ -613,7 +613,9 @@ class GitSyncApp:
         默认推送源仓所有分支；若指定 source_branch/target_branch，则只推送
         对应分支（源分支留空表示源仓默认分支 HEAD）。
         """
-        tmp_root = tempfile.mkdtemp(prefix="gitsync_")
+        # 中转目录改到当前 py 文件所在目录下（而非系统临时目录）
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        tmp_root = tempfile.mkdtemp(prefix="gitsync_", dir=script_dir)
         repo_dir = os.path.join(tmp_root, "repo.git")
         try:
             # 1. 克隆源仓库为裸仓库
