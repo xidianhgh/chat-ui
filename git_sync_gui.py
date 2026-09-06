@@ -128,8 +128,9 @@ class GitSyncApp:
         # 复选框
         style.configure("TCheckbutton", background=COLOR_CARD, foreground=COLOR_TEXT,
                         font=base_font, focuscolor=COLOR_CARD)
-        style.map("TCheckbutton", background=[("active", COLOR_CARD)],
-                  indicatorcolor=[("selected", COLOR_ACCENT), ("!selected", "#ffffff")])
+        style.map("TCheckbutton", background=[("active", COLOR_CARD)])
+        # 用自绘图标替换 clam 主题默认的 “×”：选中时显示绿色对勾
+        self._setup_checkbutton_icons(style)
 
         # 进度条
         style.configure("Horizontal.TProgressbar", troughcolor="#dcedc8", background=COLOR_ACCENT,
@@ -140,6 +141,84 @@ class GitSyncApp:
         style.configure("Vertical.TScrollbar", troughcolor="#e8f5e9", background="#a5d6a7",
                         bordercolor=COLOR_BG, arrowcolor=COLOR_ACCENT_DK, relief="flat")
         style.map("Vertical.TScrollbar", background=[("active", COLOR_ACCENT)])
+
+    # ------------------------------------------------------------------ #
+    # 复选框图标（自绘对勾，替换 clam 主题的 “×”）
+    # ------------------------------------------------------------------ #
+    def _setup_checkbutton_icons(self, style):
+        """用标准库 PhotoImage 自绘复选框图标：
+        未选中 = 白底浅绿边框空框；选中 = 绿底白色对勾。
+        然后注册为 ttk image 元素并重定义 TCheckbutton 布局，
+        以此替换 clam 主题默认的 “×” 选中符号。
+        """
+        S = 16   # 方框边长（像素）
+        W = 20   # 图标总宽（右侧 4px 留白，作为图标与文字的间距）
+        white = "#ffffff"
+        green_bg = COLOR_ACCENT       # 选中背景（绿）
+        dark_green = COLOR_ACCENT_DK  # 选中边框（深绿）
+        light_border = "#a5d6a7"      # 未选中边框（浅绿）
+
+        # 计算对勾覆盖的像素：两段折线，约 2px 粗
+        check_pixels = set()
+
+        def mark_line(x0, y0, x1, y1):
+            steps = max(abs(x1 - x0), abs(y1 - y0))
+            for i in range(steps + 1):
+                t = i / steps if steps else 0
+                x = round(x0 + (x1 - x0) * t)
+                y = round(y0 + (y1 - y0) * t)
+                for dx in (0, 1):
+                    for dy in (0, 1):
+                        if 0 <= x + dx < S and 0 <= y + dy < S:
+                            check_pixels.add((x + dx, y + dy))
+
+        mark_line(3, 8, 6, 11)
+        mark_line(6, 11, 12, 4)
+
+        def build_rows(draw_check):
+            rows = []
+            for y in range(S):
+                row = []
+                for x in range(W):
+                    if x >= S:
+                        row.append(COLOR_CARD)  # 右侧留白，与卡片背景一致
+                        continue
+                    edge = (x == 0 or y == 0 or x == S - 1 or y == S - 1)
+                    if draw_check:
+                        if (x, y) in check_pixels:
+                            row.append(white)
+                        elif edge:
+                            row.append(dark_green)
+                        else:
+                            row.append(green_bg)
+                    else:
+                        row.append(light_border if edge else white)
+                rows.append(row)
+            return rows
+
+        def to_image(rows):
+            data = " ".join("{" + " ".join(r) + "}" for r in rows)
+            img = tk.PhotoImage(width=W, height=S, master=self.root)
+            img.put(data)
+            return img
+
+        # 必须保持引用，否则会被垃圾回收导致图标消失
+        self._cb_unchecked_img = to_image(build_rows(draw_check=False))
+        self._cb_checked_img = to_image(build_rows(draw_check=True))
+
+        # 注册 image 元素（新名字，避免与主题内置元素冲突）并重定义布局
+        style.element_create("GreenCheck.indicator", "image",
+                             self._cb_unchecked_img,
+                             ("selected", self._cb_checked_img),
+                             sticky="")
+        style.layout("TCheckbutton", [
+            ("Checkbutton.padding", {"sticky": "nswe", "children": [
+                ("GreenCheck.indicator", {"side": "left", "sticky": ""}),
+                ("Checkbutton.focus", {"sticky": "", "children": [
+                    ("Checkbutton.label", {"side": "left", "sticky": ""})
+                ]})
+            ]})
+        ])
 
     # ------------------------------------------------------------------ #
     # 界面构建
