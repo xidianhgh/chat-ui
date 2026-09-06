@@ -3,9 +3,14 @@
 Git 分支同步工具
 
 功能：
-    - 界面提供两个输入框：目标 Git 地址、本地 Git 仓库目录
-    - 点击“同步”按钮后，把本地仓库的所有分支推送到目标 Git 地址（分支名保持一致）
-    - 同步过程采用 `git push <url> --all` 的“直接推送到 URL”方式，
+    - 界面提供输入框：目标 Git 地址、本地 Git 仓库目录，以及两个可选的
+      分支输入框（本地分支、目标分支）
+    - 点击“同步”按钮后，根据分支输入框的填写情况决定推送行为：
+        * 两个分支都留空：推送本地所有分支到目标地址（分支名保持一致）
+        * 只填目标分支：把本地仓库“当前分支”推送到目标仓库的目标分支
+        * 两个都填：把本地仓库所填分支推送到目标仓库的目标分支
+        * 只填本地分支：把该本地分支推送到目标仓库的同名分支
+    - 同步过程统一采用“直接推送到 URL”方式（`git push <url> ...`），
       不会新增/修改本地仓库的 remote 配置，也不会改动本地分支，
       因此同步完成后本地仓库的远程地址与分支保持原样不变。
 
@@ -49,8 +54,8 @@ class GitSyncApp:
     def __init__(self, root: tk.Tk):
         self.root = root
         self.root.title("Git 分支同步工具")
-        self.root.geometry("820x620")
-        self.root.minsize(720, 540)
+        self.root.geometry("1060x660")
+        self.root.minsize(940, 600)
         self.root.configure(bg=COLOR_BG)
 
         # 用于工作线程与主线程之间安全地传递日志/状态
@@ -229,15 +234,20 @@ class GitSyncApp:
         header.pack(fill="x")
         ttk.Label(header, text="Git 分支同步工具", style="HeaderTitle.TLabel").pack(
             anchor="w", padx=22, pady=(16, 2))
-        ttk.Label(header, text="把本地仓库的所有分支同步到目标 Git 地址，且不改动本地远程配置与分支",
+        ttk.Label(header, text="把本地仓库分支同步到目标 Git 地址（可指定分支），且不改动本地远程配置与分支",
                   style="HeaderSub.TLabel").pack(anchor="w", padx=22, pady=(0, 16))
 
-        # ---------- 主体区域 ----------
+        # ---------- 主体区域（左右两栏：左配置 / 右日志） ----------
         body = ttk.Frame(self.root)
         body.pack(fill="both", expand=True, padx=18, pady=16)
 
+        LEFT_WIDTH = 430
+        left = ttk.Frame(body, width=LEFT_WIDTH)
+        left.pack(side="left", fill="y")
+        left.pack_propagate(False)  # 固定左栏宽度，内部卡片 fill=x 自动撑满
+
         # 卡片一：仓库配置
-        card1 = ttk.Frame(body, style="Card.TFrame", padding=18)
+        card1 = ttk.Frame(left, style="Card.TFrame", padding=18)
         card1.pack(fill="x")
         ttk.Label(card1, text="仓库配置", style="CardTitle.TLabel").pack(anchor="w", pady=(0, 10))
 
@@ -255,21 +265,53 @@ class GitSyncApp:
         self.browse_btn = ttk.Button(dir_row, text="浏览...", command=self._choose_dir)
         self.browse_btn.pack(side="left", padx=(8, 0))
 
+        # 分支设置（两个输入框均为可选）
+        ttk.Label(card1, text="分支设置（均可留空）", style="Card.TLabel").pack(
+            anchor="w", pady=(14, 0))
+        branch_row = ttk.Frame(card1, style="CardFlat.TFrame")
+        branch_row.pack(fill="x", pady=(4, 0))
+
+        left_col = ttk.Frame(branch_row, style="CardFlat.TFrame")
+        left_col.pack(side="left", fill="x", expand=True)
+        ttk.Label(left_col, text="本地分支", style="Card.TLabel").pack(anchor="w")
+        self.local_branch_var = tk.StringVar()
+        self.local_branch_entry = ttk.Entry(left_col, textvariable=self.local_branch_var)
+        self.local_branch_entry.pack(fill="x", pady=(2, 0))
+
+        right_col = ttk.Frame(branch_row, style="CardFlat.TFrame")
+        right_col.pack(side="left", fill="x", expand=True, padx=(12, 0))
+        ttk.Label(right_col, text="目标分支", style="Card.TLabel").pack(anchor="w")
+        self.target_branch_var = tk.StringVar()
+        self.target_branch_entry = ttk.Entry(right_col, textvariable=self.target_branch_var)
+        self.target_branch_entry.pack(fill="x", pady=(2, 0))
+
+        ttk.Label(
+            card1,
+            text="规则：都留空→推送全部分支；仅填目标→当前分支推送到目标分支；"
+                 "都填→本地分支推送到目标分支；仅填本地→推送到目标同名分支。",
+            style="Card.TLabel", wraplength=LEFT_WIDTH - 40, justify="left").pack(
+            anchor="w", pady=(8, 0))
+
         # 卡片二：同步选项
-        card2 = ttk.Frame(body, style="Card.TFrame", padding=18)
+        card2 = ttk.Frame(left, style="Card.TFrame", padding=18)
         card2.pack(fill="x", pady=(14, 0))
         ttk.Label(card2, text="同步选项", style="CardTitle.TLabel").pack(anchor="w", pady=(0, 8))
         self.force_var = tk.BooleanVar(value=False)
         self.tags_var = tk.BooleanVar(value=False)
         ttk.Checkbutton(
-            card2, text="强制推送 (--force)：覆盖目标端冲突分支，可能导致目标端数据丢失",
-            variable=self.force_var).pack(anchor="w", pady=2)
+            card2, text="强制推送 (--force)",
+            variable=self.force_var).pack(anchor="w", pady=(2, 2))
         ttk.Checkbutton(
             card2, text="同时同步标签 (--tags)", variable=self.tags_var).pack(anchor="w", pady=2)
+        ttk.Label(
+            card2,
+            text="提示：强制推送会覆盖目标端冲突分支，可能导致目标端数据丢失。",
+            style="Card.TLabel", wraplength=LEFT_WIDTH - 40, justify="left").pack(
+            anchor="w", pady=(6, 0))
 
-        # 操作区：按钮 + 状态
-        action = ttk.Frame(body)
-        action.pack(fill="x", pady=(16, 10))
+        # 操作区：按钮 + 状态（固定左栏底部）
+        action = ttk.Frame(left)
+        action.pack(side="bottom", fill="x")
         self.sync_btn = ttk.Button(action, text="同 步", style="Accent.TButton",
                                    command=self._on_sync_clicked)
         self.sync_btn.pack(side="left")
@@ -278,13 +320,17 @@ class GitSyncApp:
         self.status_var = tk.StringVar(value="就绪")
         ttk.Label(action, textvariable=self.status_var, style="Status.TLabel").pack(side="right")
 
-        # 进度条
-        self.progress = ttk.Progressbar(body, mode="indeterminate",
+        # 进度条（位于按钮上方，固定左栏底部）
+        self.progress = ttk.Progressbar(left, mode="indeterminate",
                                         style="Horizontal.TProgressbar")
-        self.progress.pack(fill="x", pady=(0, 12))
+        self.progress.pack(side="bottom", fill="x", pady=(0, 12))
+
+        # ===== 右栏：日志面板 =====
+        right = ttk.Frame(body)
+        right.pack(side="left", fill="both", expand=True, padx=(16, 0))
 
         # 日志卡片（终端风格）
-        log_card = ttk.Frame(body, style="Card.TFrame")
+        log_card = ttk.Frame(right, style="Card.TFrame")
         log_card.pack(fill="both", expand=True)
         log_title = ttk.Frame(log_card, style="LogTitle.TFrame")
         log_title.pack(fill="x")
@@ -329,6 +375,8 @@ class GitSyncApp:
 
         url = self.url_var.get().strip()
         local_dir = self.dir_var.get().strip()
+        local_branch = self.local_branch_var.get().strip()
+        target_branch = self.target_branch_var.get().strip()
 
         # 基本校验
         if not url:
@@ -355,7 +403,8 @@ class GitSyncApp:
         # 在后台线程执行，避免界面卡死
         worker = threading.Thread(
             target=self._sync_worker,
-            args=(url, local_dir, self.force_var.get(), self.tags_var.get()),
+            args=(url, local_dir, self.force_var.get(), self.tags_var.get(),
+                  local_branch, target_branch),
             daemon=True,
         )
         worker.start()
@@ -363,12 +412,15 @@ class GitSyncApp:
     # ------------------------------------------------------------------ #
     # 后台同步逻辑
     # ------------------------------------------------------------------ #
-    def _sync_worker(self, url: str, local_dir: str, force: bool, sync_tags: bool):
+    def _sync_worker(self, url: str, local_dir: str, force: bool, sync_tags: bool,
+                     local_branch: str = "", target_branch: str = ""):
         try:
             self._log("=" * 60)
             self._log("开始同步...")
             self._log(f"目标 Git 地址 : {url}")
             self._log(f"本地仓库目录 : {local_dir}")
+            self._log(f"本地分支     : {local_branch or '(未指定)'}")
+            self._log(f"目标分支     : {target_branch or '(未指定)'}")
             self._log(f"强制推送     : {'是' if force else '否'}")
             self._log(f"同步标签     : {'是' if sync_tags else '否'}")
             self._log("=" * 60)
@@ -395,20 +447,32 @@ class GitSyncApp:
             _, branches_before = self._run_git(["branch"], local_dir)
             self._log(branches_before.strip() or "  (无本地分支)")
 
-            # 3. 推送所有本地分支到目标 URL
-            #    使用 `git push <url> --all` 直接推送到 URL，
-            #    不会新增/修改 remote，也不会改动本地分支。
-            self._log("\n[步骤] 正在推送所有分支到目标地址 ...")
-            push_cmd = ["push", url, "--all"]
+            # 3. 推送到目标 URL
+            #    统一采用“直接推送到 URL”的方式（git push <url> ...），
+            #    不会新增/修改本地 remote 配置，也不会改动本地分支。
+            if not local_branch and not target_branch:
+                # 两个分支都留空：推送所有本地分支（原逻辑）
+                self._log("\n[步骤] 未指定分支，正在推送所有分支到目标地址 ...")
+                push_cmd = ["push", url, "--all"]
+                push_desc = "所有本地分支"
+            else:
+                # 指定分支：源分支留空则用当前分支 HEAD，目标分支留空则与源同名
+                src = local_branch if local_branch else "HEAD"
+                dst = target_branch if target_branch else local_branch
+                src_desc = local_branch if local_branch else "当前分支(HEAD)"
+                self._log(f"\n[步骤] 正在推送分支：{src_desc} -> 目标分支 {dst} ...")
+                push_cmd = ["push", url, f"{src}:refs/heads/{dst}"]
+                push_desc = f"{src_desc} → 目标分支 {dst}"
             if force:
                 push_cmd.append("--force")
             ok, out = self._run_git(push_cmd, local_dir, stream=True)
             if not ok:
-                self._log("\n[错误] 分支推送失败，请检查上方输出（常见原因：地址错误、无权限、需要认证或存在冲突）。")
+                self._log("\n[错误] 分支推送失败，请检查上方输出（常见原因：地址错误、无权限、需要认证、分支不存在或存在冲突）。")
                 self._finish(False)
                 return
 
             # 4. 可选：同步标签
+            tag_result = "未同步"
             if sync_tags:
                 self._log("\n[步骤] 正在推送标签 (--tags) ...")
                 tag_cmd = ["push", url, "--tags"]
@@ -416,7 +480,10 @@ class GitSyncApp:
                     tag_cmd.append("--force")
                 ok, out = self._run_git(tag_cmd, local_dir, stream=True)
                 if not ok:
+                    tag_result = "推送失败（分支已成功）"
                     self._log("\n[警告] 标签推送失败，但分支已推送完成。")
+                else:
+                    tag_result = "已同步"
 
             # 5. 核对本地 remote 与分支是否保持原样
             self._log("\n[核对] 同步后的远程仓库配置 (git remote -v)：")
@@ -428,11 +495,34 @@ class GitSyncApp:
             self._log(branches_after.strip() or "  (无本地分支)")
 
             if remotes_before == remotes_after and branches_before == branches_after:
-                self._log("\n[成功] 所有分支已同步到目标地址，且本地远程配置与分支保持原样未变。")
-                self._finish(True)
+                self._log("\n[成功] 同步完成，明细如下：")
+                self._log(f"        推送内容 ： {push_desc}")
+                self._log(f"        目标地址 ： {url}")
+                self._log(f"        强制推送 ： {'是' if force else '否'}")
+                self._log(f"        标签同步 ： {tag_result}")
+                self._log("        本地仓库 ： 远程配置与分支保持原样未变")
+                summary = (
+                    "同步已完成！\n\n"
+                    f"推送内容：{push_desc}\n"
+                    f"目标地址：{url}\n"
+                    f"强制推送：{'是' if force else '否'}\n"
+                    f"标签同步：{tag_result}\n"
+                    "本地仓库：远程配置与分支保持原样未变"
+                )
+                self._finish(True, summary)
             else:
                 self._log("\n[完成] 同步已执行，但检测到本地 remote/分支与同步前存在差异，请人工核对上方输出。")
-                self._finish(True)
+                self._log(f"        推送内容 ： {push_desc}")
+                self._log(f"        目标地址 ： {url}")
+                self._log(f"        标签同步 ： {tag_result}")
+                summary = (
+                    "同步已执行，但检测到本地仓库状态与同步前存在差异。\n\n"
+                    f"推送内容：{push_desc}\n"
+                    f"目标地址：{url}\n"
+                    f"标签同步：{tag_result}\n\n"
+                    "请核对日志中 remote / 分支的前后变化。"
+                )
+                self._finish(True, summary)
 
         except Exception as exc:  # 兜底异常处理
             self._log(f"\n[异常] 同步过程中发生未预期的错误：{exc}")
@@ -484,9 +574,9 @@ class GitSyncApp:
     # ------------------------------------------------------------------ #
     # 界面状态与日志（线程安全）
     # ------------------------------------------------------------------ #
-    def _finish(self, success: bool):
-        """工作线程结束时调用，通知主线程恢复界面状态"""
-        self.log_queue.put(("finish", success))
+    def _finish(self, success: bool, summary: str = ""):
+        """工作线程结束时调用，通知主线程恢复界面状态并回传结果摘要"""
+        self.log_queue.put(("finish", (success, summary)))
 
     def _log(self, message: str):
         """线程安全地写日志（放入队列由主线程刷新）"""
@@ -501,14 +591,15 @@ class GitSyncApp:
                     self._append_log(payload)
                 elif kind == "finish":
                     self._set_running(False)
-                    if payload:
+                    success, summary = payload
+                    if success:
                         self.status_var.set("同步完成")
                         self._append_log("\n===== 同步结束 =====")
-                        messagebox.showinfo("完成", "同步已完成，详情见日志输出。")
+                        messagebox.showinfo("同步完成", summary or "同步已完成，详情见日志输出。")
                     else:
                         self.status_var.set("同步失败")
                         self._append_log("\n===== 同步失败 =====")
-                        messagebox.showerror("失败", "同步未成功，请查看日志输出排查原因。")
+                        messagebox.showerror("同步失败", summary or "同步未成功，请查看日志输出排查原因。")
         except queue.Empty:
             pass
         # 继续轮询
@@ -554,6 +645,8 @@ class GitSyncApp:
         self.clear_btn.configure(state=state)
         self.url_entry.configure(state=state)
         self.dir_entry.configure(state=state)
+        self.local_branch_entry.configure(state=state)
+        self.target_branch_entry.configure(state=state)
         if running:
             self.status_var.set("正在同步...")
             self.progress.start(12)
