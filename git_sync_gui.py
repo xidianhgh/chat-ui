@@ -420,6 +420,26 @@ class GitSyncApp:
             self.source_branch_row.pack_forget()
             self.local_block.pack(fill="x")
 
+    def _derive_default_target_url(self, source_url: str, local_dir: str) -> str:
+        """目标地址留空时，推导默认目标仓库地址。
+
+        规则：默认推到 git@github.com:xidianhgh/<同名仓库>.git，
+        “同名仓库”优先取自源远程仓地址，其次取自本地仓库目录名。
+        无法推导出仓库名时返回空字符串。
+        """
+        base = "git@github.com:xidianhgh"
+        ref = (source_url or "").strip() or (local_dir or "").strip()
+        if not ref:
+            return ""
+        # 兼容 git@host:user/repo、https://host/user/repo、本地路径
+        name = ref.rstrip("/").replace("\\", "/")
+        if name.endswith(".git"):
+            name = name[:-4]
+        name = name.split("/")[-1].split(":")[-1].strip()
+        if not name:
+            return ""
+        return f"{base}/{name}.git"
+
     def _on_sync_clicked(self):
         """点击同步按钮"""
         if self.is_running:
@@ -434,9 +454,6 @@ class GitSyncApp:
         source_branch = self.source_branch_var.get().strip()
 
         # 基本校验
-        if not url:
-            messagebox.showwarning("输入有误", "请填写目标 Git 地址。")
-            return
         if not source_url:
             # 未填源仓地址 → 本地仓库模式，必须提供有效的本地目录
             if not local_dir:
@@ -445,6 +462,15 @@ class GitSyncApp:
             if not os.path.isdir(local_dir):
                 messagebox.showerror("目录不存在", f"本地目录不存在：\n{local_dir}")
                 return
+
+        # 目标地址留空时，默认推导为 git@github.com:xidianhgh/<同名仓库>.git
+        if not url:
+            url = self._derive_default_target_url(source_url, local_dir)
+            if not url:
+                messagebox.showwarning("输入有误", "请填写目标 Git 地址。")
+                return
+            # 回填到输入框，让用户看到实际使用的目标地址
+            self.url_var.set(url)
 
         # 确认强制推送风险
         if self.force_var.get():
