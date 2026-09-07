@@ -5,7 +5,7 @@
       <div class="sidebar-header">
         <div class="logo">
           <span class="logo-icon">🧈</span>
-          <span class="logo-text">豆腐</span>
+          <span class="logo-text">逗包</span>
         </div>
       </div>
       <button class="new-chat-btn" @click="startNewChat">
@@ -35,7 +35,7 @@
         <!-- 欢迎界面 -->
         <div v-if="!currentChat || currentChat.messages.length === 0" class="welcome">
           <div class="welcome-icon">🧈</div>
-          <h1>你好，我是豆腐</h1>
+          <h1>你好，我是逗包</h1>
           <p>你的 AI 聊天助手，有什么可以帮你的吗？</p>
           <div class="suggestions">
             <div class="suggestion-card" v-for="s in suggestions" :key="s" @click="useSuggestion(s)">
@@ -72,7 +72,7 @@
           <textarea
             ref="inputRef"
             v-model="inputText"
-            placeholder="给豆腐发送消息..."
+            placeholder="给逗包发送消息..."
             @keydown.enter.exact.prevent="sendMessage"
             @input="autoResize"
             rows="1"
